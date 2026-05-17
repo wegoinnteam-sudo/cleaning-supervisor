@@ -1,6 +1,7 @@
 import { google } from 'googleapis'
 
 const DEFAULT_SPREADSHEET_ID = '1ALRPlfA777W1KHiHycva9RuGrPAaSwLg1mJLWS5bJcU'
+const DEFAULT_SHEET_GID = '160745438'
 const DATA_RANGE = 'A2:ZZ46'
 const KOREA_TIME_ZONE = 'Asia/Seoul'
 const ROOM_START_ROW_INDEX = 2
@@ -23,10 +24,20 @@ function getTodayInKorea(date = new Date()) {
   return `${values.year}.${values.month}.${values.day}`
 }
 
-function normalizeDate(value = '') {
-  const match = String(value).match(/(\d{4})\D?(\d{1,2})\D?(\d{1,2})/)
-  if (!match) return ''
-  const [, year, month, day] = match
+function normalizeDate(value = '', defaultYear = new Date().getFullYear()) {
+  const dateText = String(value)
+  const fullDateMatch = dateText.match(/(\d{4})\D?(\d{1,2})\D?(\d{1,2})/)
+
+  if (fullDateMatch) {
+    const [, year, month, day] = fullDateMatch
+    return `${year}.${month.padStart(2, '0')}.${day.padStart(2, '0')}`
+  }
+
+  const monthDayMatch = dateText.match(/(\d{1,2})\D+(\d{1,2})/)
+  if (!monthDayMatch) return ''
+
+  const [, month, day] = monthDayMatch
+  const year = String(defaultYear)
   return `${year}.${month.padStart(2, '0')}.${day.padStart(2, '0')}`
 }
 
@@ -106,23 +117,36 @@ function quoteSheetName(title) {
   return `'${title.replaceAll("'", "''")}'`
 }
 
-async function getFirstSheetTitle(sheets, spreadsheetId) {
+function getSheetGid() {
+  return process.env.GOOGLE_SHEET_GID || DEFAULT_SHEET_GID
+}
+
+async function getTargetSheetTitle(sheets, spreadsheetId) {
   const response = await sheets.spreadsheets.get({
     spreadsheetId,
     key: process.env.GOOGLE_API_KEY,
-    fields: 'sheets(properties(title,index))',
+    fields: 'sheets(properties(sheetId,title,index))',
   })
 
-  return response.data.sheets
+  const sheetProperties = response.data.sheets
     ?.map((sheet) => sheet.properties)
-    .sort((left, right) => left.index - right.index)[0]?.title
+    .sort((left, right) => left.index - right.index) || []
+  const targetGid = Number(getSheetGid())
+
+  if (Number.isFinite(targetGid)) {
+    const targetSheet = sheetProperties.find((sheet) => sheet.sheetId === targetGid)
+    if (targetSheet?.title) return targetSheet.title
+  }
+
+  return sheetProperties[0]?.title
 }
 
 export async function buildCleaningAssignment() {
   const sheets = getSheetsClient()
   const spreadsheetId = getSpreadsheetId()
   const today = getTodayInKorea()
-  const sheetTitle = process.env.GOOGLE_SHEET_NAME || await getFirstSheetTitle(sheets, spreadsheetId)
+  const todayYear = today.slice(0, 4)
+  const sheetTitle = process.env.GOOGLE_SHEET_NAME || await getTargetSheetTitle(sheets, spreadsheetId)
 
   if (!sheetTitle) {
     throw new Error('Google Spreadsheet에서 읽을 시트를 찾지 못했습니다.')
@@ -138,7 +162,7 @@ export async function buildCleaningAssignment() {
 
   const rowData = response.data.sheets?.[0]?.data?.[0]?.rowData || []
   const dateRow = rowData[0]?.values || []
-  const dateColumnIndex = dateRow.findIndex((cell) => normalizeDate(getCellValue(cell)) === today)
+  const dateColumnIndex = dateRow.findIndex((cell) => normalizeDate(getCellValue(cell), todayYear) === today)
 
   if (dateColumnIndex === -1) {
     throw new Error(`${sheetTitle} 시트 2행에서 오늘 날짜(${today}) 열을 찾지 못했습니다.`)

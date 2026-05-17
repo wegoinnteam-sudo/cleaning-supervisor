@@ -5,6 +5,7 @@ Google Spreadsheet를 읽어서 오늘 청소해야 하는 객실 목록과 직�
 ## 기능
 
 - 한국시간 기준 오늘 날짜를 계산합니다.
+- 기본 대상 탭은 `gid=160745438`입니다.
 - 시트 2행에서 오늘 날짜와 같은 열을 찾습니다.
 - 4행부터 46행까지 객실 정보를 확인합니다.
 - 오늘 날짜 열의 셀 배경색이 빨간색 또는 회색 계열이면 청소 대상 객실로 분류합니다.
@@ -25,6 +26,7 @@ cp .env.example .env
 `.env`에 아래 값을 입력합니다.
 
 ```bash
+GOOGLE_SHEET_GID=160745438
 GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@project.iam.gserviceaccount.com
 GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
