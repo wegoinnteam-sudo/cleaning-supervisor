@@ -3,6 +3,9 @@
   --text-h: #08060d;
   --bg: #fff;
   --border: #e5e4e7;
+  --border-soft: #f0eff2;
+  --surface: #fafafa;
+  --panel: #ffffff;
   --code-bg: #f4f3ec;
   --accent: #aa3bff;
   --accent-bg: rgba(170, 59, 255, 0.1);
@@ -16,7 +19,7 @@
   --mono: ui-monospace, Consolas, monospace;
 
   font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
+  letter-spacing: 0;
   color-scheme: light dark;
   color: var(--text);
   background: var(--bg);
@@ -36,6 +39,9 @@
     --text-h: #f3f4f6;
     --bg: #16171d;
     --border: #2e303a;
+    --border-soft: #242730;
+    --surface: #1f2028;
+    --panel: #181a21;
     --code-bg: #1f2028;
     --accent: #c084fc;
     --accent-bg: rgba(192, 132, 252, 0.15);
@@ -58,7 +64,7 @@ body {
   width: 1126px;
   max-width: 100%;
   margin: 0 auto;
-  text-align: center;
+  text-align: left;
   border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
@@ -75,7 +81,7 @@ h2 {
 
 h1 {
   font-size: 56px;
-  letter-spacing: -1.68px;
+  letter-spacing: 0;
   margin: 32px 0;
   @media (max-width: 1024px) {
     font-size: 36px;
