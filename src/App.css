@@ -9,6 +9,7 @@
 }
 
 .topbar,
+.category-tabs,
 .summary-strip,
 .container-grid {
   width: 100%;
@@ -54,6 +55,37 @@
 .refresh-button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.category-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.category-tabs button {
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: 800 16px/1 var(--sans);
+  padding: 0 18px 14px;
+}
+
+.category-tabs button:hover,
+.category-tabs button:focus-visible {
+  color: var(--text-h);
+}
+
+.category-tabs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.category-tabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--text-h);
 }
 
 .summary-strip {
@@ -113,6 +145,10 @@
   border-radius: 8px;
   background: var(--panel);
   overflow: hidden;
+}
+
+.placeholder-panel {
+  width: 100%;
 }
 
 .panel-heading {
@@ -258,6 +294,16 @@
 
   .refresh-button {
     width: 100%;
+  }
+
+  .category-tabs {
+    overflow-x: auto;
+  }
+
+  .category-tabs button {
+    flex: 0 0 auto;
+    padding-right: 14px;
+    padding-left: 14px;
   }
 
   .summary-strip,

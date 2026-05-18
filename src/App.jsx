@@ -16,6 +16,7 @@ function App() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [checkedRooms, setCheckedRooms] = useState(() => new Set())
+  const [activeCategory, setActiveCategory] = useState('rooms')
 
   async function fetchAssignment(forceRefresh = false) {
     const response = await fetch(`/api/cleaning-assignment${forceRefresh ? '?refresh=true' : ''}`)
@@ -128,6 +129,23 @@ function App() {
         </button>
       </header>
 
+      <nav className="category-tabs" aria-label="카테고리">
+        <button
+          type="button"
+          className={activeCategory === 'rooms' ? 'active' : ''}
+          onClick={() => setActiveCategory('rooms')}
+        >
+          객실 청소배정
+        </button>
+        <button
+          type="button"
+          className={activeCategory === 'items' ? 'active' : ''}
+          onClick={() => setActiveCategory('items')}
+        >
+          필요 품목 갯수
+        </button>
+      </nav>
+
       {error && (
         <section className="notice" role="alert">
           <strong>데이터를 읽을 수 없습니다.</strong>
@@ -142,7 +160,7 @@ function App() {
         </section>
       )}
 
-      {assignment && (
+      {activeCategory === 'rooms' && assignment && (
         <section className="summary-strip" aria-label="요약">
           <div>
             <span>시트</span>
@@ -159,7 +177,7 @@ function App() {
         </section>
       )}
 
-      {assignment && (
+      {activeCategory === 'rooms' && assignment && (
         <div className="container-grid">
           <section className="container-panel">
             <div className="panel-heading">
@@ -226,6 +244,16 @@ function App() {
             </div>
           </section>
         </div>
+      )}
+
+      {activeCategory === 'items' && (
+        <section className="container-panel placeholder-panel">
+          <div className="panel-heading">
+            <p className="container-label">필요 품목 갯수</p>
+            <h2>품목 집계</h2>
+          </div>
+          <p className="empty">필요 품목 갯수는 다음 단계에서 연결합니다.</p>
+        </section>
       )}
     </main>
   )
