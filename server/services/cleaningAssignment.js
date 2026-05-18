@@ -52,7 +52,7 @@ function getCellColor(cell = {}) {
     || {}
 }
 
-function isRedOrGray(color = {}) {
+function isTargetCleaningColor(color = {}) {
   const red = color.red ?? 1
   const green = color.green ?? 1
   const blue = color.blue ?? 1
@@ -61,8 +61,9 @@ function isRedOrGray(color = {}) {
   const luma = red * 0.299 + green * 0.587 + blue * 0.114
   const isRed = red >= 0.65 && red - green >= 0.18 && red - blue >= 0.18
   const isGray = max - min <= 0.12 && luma >= 0.15 && luma <= 0.88
+  const isLightGreen = green >= 0.6 && green - red >= 0.12 && green - blue >= 0.12 && luma >= 0.45
 
-  return isRed || isGray
+  return isRed || isGray || isLightGreen
 }
 
 function compareRoomNumber(left, right) {
@@ -180,7 +181,7 @@ export async function buildCleaningAssignment() {
       const assignmentCell = values[dateColumnIndex]
       const staffName = getCellValue(assignmentCell)
 
-      if (!roomNumber || !roomType || !staffName || !assignmentCell || !isRedOrGray(getCellColor(assignmentCell))) {
+      if (!roomNumber || !roomType || !staffName || !assignmentCell || !isTargetCleaningColor(getCellColor(assignmentCell))) {
         return null
       }
 
