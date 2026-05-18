@@ -168,12 +168,15 @@ export async function buildCleaningAssignment() {
     throw new Error(`${sheetTitle} 시트 2행에서 오늘 날짜(${today}) 열을 찾지 못했습니다.`)
   }
 
+  let currentRoomType = ''
   const rooms = rowData
     .slice(ROOM_START_ROW_INDEX)
     .map((row) => {
       const values = row.values || []
       const roomNumber = getCellValue(values[ROOM_NUMBER_COLUMN_INDEX])
-      const roomType = getCellValue(values[ROOM_TYPE_COLUMN_INDEX]).toUpperCase()
+      const explicitRoomType = getCellValue(values[ROOM_TYPE_COLUMN_INDEX])
+      if (explicitRoomType) currentRoomType = explicitRoomType
+      const roomType = currentRoomType.toUpperCase()
       const assignmentCell = values[dateColumnIndex]
       const staffName = getCellValue(assignmentCell)
 
