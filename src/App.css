@@ -213,6 +213,10 @@
   border-collapse: collapse;
 }
 
+.floor-item-table {
+  min-width: 860px;
+}
+
 .item-table th,
 .item-table td {
   border-bottom: 1px solid var(--border-soft);

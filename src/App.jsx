@@ -116,6 +116,15 @@ function normalizeRoomType(roomType = '') {
   return String(roomType).replace(/\s+/g, ' ').trim().toUpperCase()
 }
 
+function getRoomFloor(roomNumber = '') {
+  const floor = String(roomNumber).trim().charAt(0)
+  return floor ? `${floor}층` : '미지정'
+}
+
+function createSupplyTotals() {
+  return Object.fromEntries(supplyColumns.map((column) => [column.key, 0]))
+}
+
 function App() {
   const [assignment, setAssignment] = useState(null)
   const [error, setError] = useState('')
@@ -191,8 +200,9 @@ function App() {
   }, [assignment, checkedRooms])
 
   const supplySummary = useMemo(() => {
-    const totals = Object.fromEntries(supplyColumns.map((column) => [column.key, 0]))
+    const totals = createSupplyTotals()
     const byRoomType = {}
+    const byFloor = {}
     const unmatchedRoomTypes = new Set()
 
     assignment?.rooms?.forEach((room) => {
@@ -210,19 +220,33 @@ function App() {
           count: 0,
           capacity: rule.capacity,
           bedSetup: rule.bedSetup,
-          totals: Object.fromEntries(supplyColumns.map((column) => [column.key, 0])),
+          totals: createSupplyTotals(),
+        }
+      }
+
+      const floor = getRoomFloor(room.roomNumber)
+      if (!byFloor[floor]) {
+        byFloor[floor] = {
+          floor,
+          count: 0,
+          totals: createSupplyTotals(),
         }
       }
 
       byRoomType[roomType].count += 1
+      byFloor[floor].count += 1
       supplyColumns.forEach((column) => {
         totals[column.key] += rule[column.key]
         byRoomType[roomType].totals[column.key] += rule[column.key]
+        byFloor[floor].totals[column.key] += rule[column.key]
       })
     })
 
     return {
       totals,
+      byFloor: Object.values(byFloor).sort((left, right) => (
+        left.floor.localeCompare(right.floor, 'ko-KR', { numeric: true, sensitivity: 'base' })
+      )),
       byRoomType: Object.values(byRoomType).sort((left, right) => (
         left.roomType.localeCompare(right.roomType, 'ko-KR', { numeric: true, sensitivity: 'base' })
       )),
@@ -405,6 +429,37 @@ function App() {
                   <strong>{supplySummary.totals[column.key]}</strong>
                 </div>
               ))}
+            </div>
+          </section>
+
+          <section className="container-panel">
+            <div className="panel-heading">
+              <p className="container-label">Floor</p>
+              <h2>층별 필요 품목</h2>
+            </div>
+            <div className="item-table-wrap">
+              <table className="item-table floor-item-table">
+                <thead>
+                  <tr>
+                    <th>층</th>
+                    <th>객실</th>
+                    {supplyColumns.map((column) => (
+                      <th key={column.key}>{column.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {supplySummary.byFloor.map((floor) => (
+                    <tr key={floor.floor}>
+                      <td>{floor.floor}</td>
+                      <td>{floor.count}</td>
+                      {supplyColumns.map((column) => (
+                        <td key={column.key}>{floor.totals[column.key]}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </section>
 
