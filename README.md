@@ -49,6 +49,33 @@ npm run dev
 
 브라우저에서 Vite가 표시한 주소를 엽니다. 기본 API 주소는 `http://localhost:3001`이고, Vite 개발 서버가 `/api` 요청을 프록시합니다.
 
+## Cloudflare Pages 배포
+
+Cloudflare Pages는 정적 Vite 빌드만으로는 `/api/cleaning-assignment`를 실행하지 못합니다.
+이 프로젝트는 `functions/api/cleaning-assignment.js` Pages Function으로 라이브 API를 제공합니다.
+
+Pages 설정:
+
+```text
+Build command: npm run build
+Build output directory: dist
+```
+
+Cloudflare Pages 환경변수에는 아래 중 하나를 설정합니다.
+
+```text
+GOOGLE_SPREADSHEET_ID=1ALRPlfA777W1KHiHycva9RuGrPAaSwLg1mJLWS5bJcU
+GOOGLE_SHEET_GID=160745438
+GOOGLE_API_KEY=...
+```
+
+또는 서비스 계정을 쓸 경우:
+
+```text
+GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@project.iam.gserviceaccount.com
+GOOGLE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n
+```
+
 ## API
 
 ```text
