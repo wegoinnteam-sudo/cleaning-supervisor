@@ -7,10 +7,15 @@ const formatter = new Intl.DateTimeFormat('ko-KR', {
   timeStyle: 'short',
 })
 
+function getRoomKey(room) {
+  return `${room.roomNumber}-${room.roomType}`
+}
+
 function App() {
   const [assignment, setAssignment] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [checkedRooms, setCheckedRooms] = useState(() => new Set())
 
   async function fetchAssignment(forceRefresh = false) {
     const response = await fetch(`/api/cleaning-assignment${forceRefresh ? '?refresh=true' : ''}`)
@@ -69,6 +74,45 @@ function App() {
     ))
   }, [assignment])
 
+  const pendingRooms = useMemo(() => {
+    if (!assignment?.rooms) return []
+    return assignment.rooms.filter((room) => !checkedRooms.has(getRoomKey(room)))
+  }, [assignment, checkedRooms])
+
+  const completedRooms = useMemo(() => {
+    if (!assignment?.rooms) return []
+    return assignment.rooms.filter((room) => checkedRooms.has(getRoomKey(room)))
+  }, [assignment, checkedRooms])
+
+  function toggleRoom(room) {
+    const roomKey = getRoomKey(room)
+
+    setCheckedRooms((current) => {
+      const next = new Set(current)
+      if (next.has(roomKey)) {
+        next.delete(roomKey)
+      } else {
+        next.add(roomKey)
+      }
+      return next
+    })
+  }
+
+  function renderRoomRow(room, isChecked = false) {
+    return (
+      <label className={`room-row${isChecked ? ' is-checked' : ''}`} key={getRoomKey(room)}>
+        <span>{room.roomNumber}</span>
+        <strong>{room.roomType}</strong>
+        <input
+          type="checkbox"
+          checked={isChecked}
+          onChange={() => toggleRoom(room)}
+          aria-label={`${room.roomNumber} ${room.roomType} 완료`}
+        />
+      </label>
+    )
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -124,12 +168,23 @@ function App() {
             </div>
 
             <div className="room-list">
-              {assignment.rooms.length > 0 ? assignment.rooms.map((room) => (
-                <div className="room-row" key={`${room.roomNumber}-${room.roomType}`}>
-                  <span>{room.roomNumber}</span>
-                  <strong>{room.roomType}</strong>
-                </div>
-              )) : (
+              {assignment.rooms.length > 0 ? (
+                <>
+                  <div className="room-section">
+                    {pendingRooms.map((room) => renderRoomRow(room))}
+                  </div>
+
+                  {completedRooms.length > 0 && (
+                    <div className="room-section completed-room-section">
+                      <div className="room-section-heading">
+                        <span>체크된 객실</span>
+                        <strong>{completedRooms.length}</strong>
+                      </div>
+                      {completedRooms.map((room) => renderRoomRow(room, true))}
+                    </div>
+                  )}
+                </>
+              ) : (
                 <p className="empty">오늘 청소 대상 객실이 없습니다.</p>
               )}
             </div>
