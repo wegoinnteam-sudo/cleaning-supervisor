@@ -12,6 +12,8 @@ const translations = {
     itemsTab: '필요 품목 갯수',
     loadErrorTitle: '데이터를 읽을 수 없습니다.',
     loadErrorFallback: '청소 배정 정보를 불러오지 못했습니다.',
+    checkSyncErrorTitle: '체크 상태를 저장할 수 없습니다.',
+    checkSyncErrorFallback: '공유 체크 상태를 저장하지 못했습니다.',
     loadingTitle: '불러오는 중',
     loadingMessage: '스프레드시트의 날짜 열, 객실 정보, 셀 배경색을 확인하고 있습니다.',
     sheet: '시트',
@@ -49,6 +51,8 @@ const translations = {
     itemsTab: 'Required Item Count',
     loadErrorTitle: 'Unable to read data.',
     loadErrorFallback: 'Unable to load cleaning assignment data.',
+    checkSyncErrorTitle: 'Unable to save check status.',
+    checkSyncErrorFallback: 'Unable to save shared check status.',
     loadingTitle: 'Loading',
     loadingMessage: 'Checking the spreadsheet date column, room information, and cell background colors.',
     sheet: 'Sheet',
@@ -199,6 +203,7 @@ function createSupplyTotals() {
 function App() {
   const [assignment, setAssignment] = useState(null)
   const [error, setError] = useState('')
+  const [checkError, setCheckError] = useState('')
   const [loading, setLoading] = useState(true)
   const [checkedRooms, setCheckedRooms] = useState(() => new Set())
   const [activeCategory, setActiveCategory] = useState('rooms')
@@ -220,6 +225,32 @@ function App() {
 
     return data
   }, [t.loadErrorFallback])
+
+  const fetchRoomChecks = useCallback(async (date) => {
+    const response = await fetch(`/api/room-checks?date=${encodeURIComponent(date)}`)
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.message || t.checkSyncErrorFallback)
+    }
+
+    return data.checkedRoomKeys || []
+  }, [t.checkSyncErrorFallback])
+
+  const saveRoomCheck = useCallback(async ({ date, roomKey, checked }) => {
+    const response = await fetch('/api/room-checks', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ date, roomKey, checked }),
+    })
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.message || t.checkSyncErrorFallback)
+    }
+
+    return data.checkedRoomKeys || []
+  }, [t.checkSyncErrorFallback])
 
   async function refreshAssignment() {
     setLoading(true)
@@ -252,6 +283,27 @@ function App() {
       ignore = true
     }
   }, [fetchAssignment])
+
+  useEffect(() => {
+    if (!assignment?.date) return
+
+    let ignore = false
+
+    fetchRoomChecks(assignment.date)
+      .then((checkedRoomKeys) => {
+        if (!ignore) {
+          setCheckError('')
+          setCheckedRooms(new Set(checkedRoomKeys))
+        }
+      })
+      .catch((loadError) => {
+        if (!ignore) setCheckError(loadError.message)
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [assignment?.date, fetchRoomChecks])
 
   const staffNames = useMemo(() => {
     if (!assignment?.byStaff) return []
@@ -332,18 +384,35 @@ function App() {
     }
   }, [assignment, language])
 
-  function toggleRoom(room) {
+  async function toggleRoom(room) {
+    if (!assignment?.date) return
+
     const roomKey = getRoomKey(room)
+    const checked = !checkedRooms.has(roomKey)
+    const previousCheckedRooms = checkedRooms
 
     setCheckedRooms((current) => {
       const next = new Set(current)
-      if (next.has(roomKey)) {
-        next.delete(roomKey)
-      } else {
+      if (checked) {
         next.add(roomKey)
+      } else {
+        next.delete(roomKey)
       }
       return next
     })
+    setCheckError('')
+
+    try {
+      const checkedRoomKeys = await saveRoomCheck({
+        date: assignment.date,
+        roomKey,
+        checked,
+      })
+      setCheckedRooms(new Set(checkedRoomKeys))
+    } catch (saveError) {
+      setCheckedRooms(previousCheckedRooms)
+      setCheckError(saveError.message)
+    }
   }
 
   function renderRoomRow(room, isChecked = false) {
@@ -415,6 +484,13 @@ function App() {
         <section className="notice" role="alert">
           <strong>{t.loadErrorTitle}</strong>
           <span>{error}</span>
+        </section>
+      )}
+
+      {checkError && (
+        <section className="notice" role="alert">
+          <strong>{t.checkSyncErrorTitle}</strong>
+          <span>{checkError}</span>
         </section>
       )}
 

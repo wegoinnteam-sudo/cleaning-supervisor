@@ -76,11 +76,23 @@ GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@project.iam.gserviceaccount.com
 GOOGLE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n
 ```
 
+객실 체크박스를 여러 사용자가 공유하려면 Cloudflare KV namespace를 만들고 Pages Function 바인딩을 추가합니다.
+
+```text
+Binding type: KV namespace
+Variable name: ROOM_CHECKS
+KV namespace: cleaning-supervisor-room-checks
+```
+
+체크 상태는 날짜별 key로 저장되므로 새 한국시간 날짜가 되면 자동으로 빈 체크 상태로 시작합니다.
+
 ## API
 
 ```text
 GET /api/cleaning-assignment
 GET /api/cleaning-assignment?refresh=true
+GET /api/room-checks?date=2026.05.18
+POST /api/room-checks
 ```
 
 응답에는 `rooms`, `countsByType`, `total`, `byStaff`, `date`, `updatedAt`가 포함됩니다.
