@@ -11,6 +11,111 @@ function getRoomKey(room) {
   return `${room.roomNumber}-${room.roomType}`
 }
 
+const supplyColumns = [
+  { key: 'singleDuvetCover', label: '싱글 이불커버' },
+  { key: 'doubleDuvetCover', label: '더블 이불커버' },
+  { key: 'singleMattressCover', label: '싱글 매트리스커버' },
+  { key: 'doubleMattressCover', label: '더블 매트리스커버' },
+  { key: 'pillowCover', label: '베개커버' },
+  { key: 'towel', label: '수건' },
+  { key: 'bathMat', label: '발매트' },
+]
+
+const roomTypeSupplyRules = {
+  SINGLE: {
+    capacity: '1명',
+    bedSetup: '싱글베드 1',
+    singleDuvetCover: 1,
+    doubleDuvetCover: 0,
+    singleMattressCover: 1,
+    doubleMattressCover: 0,
+    pillowCover: 1,
+    towel: 2,
+    bathMat: 1,
+  },
+  DOUBLE: {
+    capacity: '2명',
+    bedSetup: '더블베드 1',
+    singleDuvetCover: 0,
+    doubleDuvetCover: 1,
+    singleMattressCover: 0,
+    doubleMattressCover: 1,
+    pillowCover: 2,
+    towel: 4,
+    bathMat: 1,
+  },
+  HANDIC: {
+    capacity: '2명',
+    bedSetup: '더블베드 1',
+    singleDuvetCover: 0,
+    doubleDuvetCover: 1,
+    singleMattressCover: 0,
+    doubleMattressCover: 1,
+    pillowCover: 2,
+    towel: 4,
+    bathMat: 1,
+  },
+  'TWIN BUNK': {
+    capacity: '2명',
+    bedSetup: '싱글 2층침대 1개',
+    singleDuvetCover: 2,
+    doubleDuvetCover: 0,
+    singleMattressCover: 2,
+    doubleMattressCover: 0,
+    pillowCover: 2,
+    towel: 4,
+    bathMat: 1,
+  },
+  TWIN: {
+    capacity: '2명',
+    bedSetup: '싱글베드 2',
+    singleDuvetCover: 2,
+    doubleDuvetCover: 0,
+    singleMattressCover: 2,
+    doubleMattressCover: 0,
+    pillowCover: 2,
+    towel: 4,
+    bathMat: 1,
+  },
+  TRIPLE: {
+    capacity: '3명',
+    bedSetup: '싱글베드 1 + 더블베드 1',
+    singleDuvetCover: 1,
+    doubleDuvetCover: 1,
+    singleMattressCover: 1,
+    doubleMattressCover: 1,
+    pillowCover: 3,
+    towel: 6,
+    bathMat: 1,
+  },
+  '4 BUNK': {
+    capacity: '4명',
+    bedSetup: '싱글 2층침대 2개',
+    singleDuvetCover: 4,
+    doubleDuvetCover: 0,
+    singleMattressCover: 4,
+    doubleMattressCover: 0,
+    pillowCover: 4,
+    towel: 8,
+    bathMat: 1,
+  },
+  'STANDARD FAMILY': {
+    capacity: '4명',
+    bedSetup: '더블베드 2',
+    singleDuvetCover: 0,
+    doubleDuvetCover: 2,
+    singleMattressCover: 0,
+    doubleMattressCover: 2,
+    pillowCover: 4,
+    towel: 8,
+    bathMat: 1,
+  },
+}
+
+function normalizeRoomType(roomType = '') {
+  return String(roomType).replace(/\s+/g, ' ').trim().toUpperCase()
+}
+
 function App() {
   const [assignment, setAssignment] = useState(null)
   const [error, setError] = useState('')
@@ -84,6 +189,46 @@ function App() {
     if (!assignment?.rooms) return []
     return assignment.rooms.filter((room) => checkedRooms.has(getRoomKey(room)))
   }, [assignment, checkedRooms])
+
+  const supplySummary = useMemo(() => {
+    const totals = Object.fromEntries(supplyColumns.map((column) => [column.key, 0]))
+    const byRoomType = {}
+    const unmatchedRoomTypes = new Set()
+
+    assignment?.rooms?.forEach((room) => {
+      const roomType = normalizeRoomType(room.roomType)
+      const rule = roomTypeSupplyRules[roomType]
+
+      if (!rule) {
+        unmatchedRoomTypes.add(roomType)
+        return
+      }
+
+      if (!byRoomType[roomType]) {
+        byRoomType[roomType] = {
+          roomType,
+          count: 0,
+          capacity: rule.capacity,
+          bedSetup: rule.bedSetup,
+          totals: Object.fromEntries(supplyColumns.map((column) => [column.key, 0])),
+        }
+      }
+
+      byRoomType[roomType].count += 1
+      supplyColumns.forEach((column) => {
+        totals[column.key] += rule[column.key]
+        byRoomType[roomType].totals[column.key] += rule[column.key]
+      })
+    })
+
+    return {
+      totals,
+      byRoomType: Object.values(byRoomType).sort((left, right) => (
+        left.roomType.localeCompare(right.roomType, 'ko-KR', { numeric: true, sensitivity: 'base' })
+      )),
+      unmatchedRoomTypes: [...unmatchedRoomTypes].sort(),
+    }
+  }, [assignment])
 
   function toggleRoom(room) {
     const roomKey = getRoomKey(room)
@@ -246,14 +391,65 @@ function App() {
         </div>
       )}
 
-      {activeCategory === 'items' && (
-        <section className="container-panel placeholder-panel">
-          <div className="panel-heading">
-            <p className="container-label">필요 품목 갯수</p>
-            <h2>품목 집계</h2>
-          </div>
-          <p className="empty">필요 품목 갯수는 다음 단계에서 연결합니다.</p>
-        </section>
+      {activeCategory === 'items' && assignment && (
+        <div className="item-count-layout">
+          <section className="container-panel">
+            <div className="panel-heading">
+              <p className="container-label">필요 품목 갯수</p>
+              <h2>전체 품목 합계</h2>
+            </div>
+            <div className="item-total-grid">
+              {supplyColumns.map((column) => (
+                <div className="item-total" key={column.key}>
+                  <span>{column.label}</span>
+                  <strong>{supplySummary.totals[column.key]}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="container-panel">
+            <div className="panel-heading">
+              <p className="container-label">Room Type</p>
+              <h2>타입별 품목 계산</h2>
+            </div>
+            <div className="item-table-wrap">
+              <table className="item-table">
+                <thead>
+                  <tr>
+                    <th>Room Type</th>
+                    <th>객실</th>
+                    <th>기준 인원</th>
+                    <th>침대 구성</th>
+                    {supplyColumns.map((column) => (
+                      <th key={column.key}>{column.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {supplySummary.byRoomType.map((roomType) => (
+                    <tr key={roomType.roomType}>
+                      <td>{roomType.roomType}</td>
+                      <td>{roomType.count}</td>
+                      <td>{roomType.capacity}</td>
+                      <td>{roomType.bedSetup}</td>
+                      {supplyColumns.map((column) => (
+                        <td key={column.key}>{roomType.totals[column.key]}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {supplySummary.unmatchedRoomTypes.length > 0 && (
+            <section className="notice" role="alert">
+              <strong>품목 기준이 없는 Room Type이 있습니다.</strong>
+              <span>{supplySummary.unmatchedRoomTypes.join(', ')}</span>
+            </section>
+          )}
+        </div>
       )}
     </main>
   )
