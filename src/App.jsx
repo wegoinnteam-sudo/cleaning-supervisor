@@ -1,30 +1,101 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
-const formatter = new Intl.DateTimeFormat('ko-KR', {
-  timeZone: 'Asia/Seoul',
-  dateStyle: 'full',
-  timeStyle: 'short',
-})
+const translations = {
+  ko: {
+    locale: 'ko-KR',
+    productName: '청소 관리',
+    title: '객실 청소 배정',
+    subtitle: (date) => `한국시간 ${date || '오늘'} 기준 Google Spreadsheet 실시간 데이터`,
+    refresh: '새로고침',
+    roomsTab: '객실 청소배정',
+    itemsTab: '필요 품목 갯수',
+    loadErrorTitle: '데이터를 읽을 수 없습니다.',
+    loadErrorFallback: '청소 배정 정보를 불러오지 못했습니다.',
+    loadingTitle: '불러오는 중',
+    loadingMessage: '스프레드시트의 날짜 열, 객실 정보, 셀 배경색을 확인하고 있습니다.',
+    sheet: '시트',
+    totalCleaningRooms: '총 청소 객실',
+    lastUpdated: '마지막 갱신',
+    containerOne: '컨테이너 1',
+    todayRooms: '오늘 청소해야 하는 객실 목록',
+    checkedRooms: '체크된 객실',
+    noCleaningRooms: '오늘 청소 대상 객실이 없습니다.',
+    total: 'TOTAL',
+    containerTwo: '컨테이너 2',
+    staffAssignments: '직원별 청소 배정 리스트',
+    noStaffAssignments: '직원 배정 내역이 없습니다.',
+    completedLabel: (room) => `${room.roomNumber} ${room.roomType} 완료`,
+    supplyCount: '필요 품목 갯수',
+    totalSupplyCount: '전체 품목 합계',
+    floor: '층',
+    rooms: '객실',
+    floorSupplyCount: '층별 필요 품목',
+    roomType: '객실 타입',
+    roomTypeSupplyCount: '타입별 품목 계산',
+    capacity: '기준 인원',
+    bedSetup: '침대 구성',
+    missingRuleTitle: '품목 기준이 없는 Room Type이 있습니다.',
+    unspecified: '미지정',
+    floorLabel: (floor) => `${floor}층`,
+  },
+  en: {
+    locale: 'en-US',
+    productName: 'Cleaning Supervisor',
+    title: 'Room Cleaning Assignment',
+    subtitle: (date) => `Live Google Spreadsheet data for ${date || 'today'} in Korea time`,
+    refresh: 'Refresh',
+    roomsTab: 'Room Cleaning Assignment',
+    itemsTab: 'Required Item Count',
+    loadErrorTitle: 'Unable to read data.',
+    loadErrorFallback: 'Unable to load cleaning assignment data.',
+    loadingTitle: 'Loading',
+    loadingMessage: 'Checking the spreadsheet date column, room information, and cell background colors.',
+    sheet: 'Sheet',
+    totalCleaningRooms: 'Total Cleaning Rooms',
+    lastUpdated: 'Last Updated',
+    containerOne: 'Container 1',
+    todayRooms: 'Rooms to Clean Today',
+    checkedRooms: 'Checked Rooms',
+    noCleaningRooms: 'There are no rooms to clean today.',
+    total: 'TOTAL',
+    containerTwo: 'Container 2',
+    staffAssignments: 'Cleaning Assignments by Staff',
+    noStaffAssignments: 'There are no staff assignments.',
+    completedLabel: (room) => `${room.roomNumber} ${room.roomType} completed`,
+    supplyCount: 'Required Item Count',
+    totalSupplyCount: 'Total Required Items',
+    floor: 'Floor',
+    rooms: 'Rooms',
+    floorSupplyCount: 'Required Items by Floor',
+    roomType: 'Room Type',
+    roomTypeSupplyCount: 'Required Items by Room Type',
+    capacity: 'Capacity',
+    bedSetup: 'Bed Setup',
+    missingRuleTitle: 'Some Room Types do not have item rules.',
+    unspecified: 'Unspecified',
+    floorLabel: (floor) => `Floor ${floor}`,
+  },
+}
 
 function getRoomKey(room) {
   return `${room.roomNumber}-${room.roomType}`
 }
 
 const supplyColumns = [
-  { key: 'singleDuvetCover', label: '싱글 이불커버' },
-  { key: 'doubleDuvetCover', label: '더블 이불커버' },
-  { key: 'singleMattressCover', label: '싱글 매트리스커버' },
-  { key: 'doubleMattressCover', label: '더블 매트리스커버' },
-  { key: 'pillowCover', label: '베개커버' },
-  { key: 'towel', label: '수건' },
-  { key: 'bathMat', label: '발매트' },
+  { key: 'singleDuvetCover', label: { ko: '싱글 이불커버', en: 'Single Duvet Cover' } },
+  { key: 'doubleDuvetCover', label: { ko: '더블 이불커버', en: 'Double Duvet Cover' } },
+  { key: 'singleMattressCover', label: { ko: '싱글 매트리스커버', en: 'Single Mattress Cover' } },
+  { key: 'doubleMattressCover', label: { ko: '더블 매트리스커버', en: 'Double Mattress Cover' } },
+  { key: 'pillowCover', label: { ko: '베개커버', en: 'Pillow Cover' } },
+  { key: 'towel', label: { ko: '수건', en: 'Towels' } },
+  { key: 'bathMat', label: { ko: '발매트', en: 'Bath Mat' } },
 ]
 
 const roomTypeSupplyRules = {
   SINGLE: {
-    capacity: '1명',
-    bedSetup: '싱글베드 1',
+    capacity: { ko: '1명', en: '1 person' },
+    bedSetup: { ko: '싱글베드 1', en: '1 single bed' },
     singleDuvetCover: 1,
     doubleDuvetCover: 0,
     singleMattressCover: 1,
@@ -34,8 +105,8 @@ const roomTypeSupplyRules = {
     bathMat: 1,
   },
   DOUBLE: {
-    capacity: '2명',
-    bedSetup: '더블베드 1',
+    capacity: { ko: '2명', en: '2 people' },
+    bedSetup: { ko: '더블베드 1', en: '1 double bed' },
     singleDuvetCover: 0,
     doubleDuvetCover: 1,
     singleMattressCover: 0,
@@ -45,8 +116,8 @@ const roomTypeSupplyRules = {
     bathMat: 1,
   },
   HANDIC: {
-    capacity: '2명',
-    bedSetup: '더블베드 1',
+    capacity: { ko: '2명', en: '2 people' },
+    bedSetup: { ko: '더블베드 1', en: '1 double bed' },
     singleDuvetCover: 0,
     doubleDuvetCover: 1,
     singleMattressCover: 0,
@@ -56,8 +127,8 @@ const roomTypeSupplyRules = {
     bathMat: 1,
   },
   'TWIN BUNK': {
-    capacity: '2명',
-    bedSetup: '싱글 2층침대 1개',
+    capacity: { ko: '2명', en: '2 people' },
+    bedSetup: { ko: '싱글 2층침대 1개', en: '1 single bunk bed' },
     singleDuvetCover: 2,
     doubleDuvetCover: 0,
     singleMattressCover: 2,
@@ -67,8 +138,8 @@ const roomTypeSupplyRules = {
     bathMat: 1,
   },
   TWIN: {
-    capacity: '2명',
-    bedSetup: '싱글베드 2',
+    capacity: { ko: '2명', en: '2 people' },
+    bedSetup: { ko: '싱글베드 2', en: '2 single beds' },
     singleDuvetCover: 2,
     doubleDuvetCover: 0,
     singleMattressCover: 2,
@@ -78,8 +149,8 @@ const roomTypeSupplyRules = {
     bathMat: 1,
   },
   TRIPLE: {
-    capacity: '3명',
-    bedSetup: '싱글베드 1 + 더블베드 1',
+    capacity: { ko: '3명', en: '3 people' },
+    bedSetup: { ko: '싱글베드 1 + 더블베드 1', en: '1 single bed + 1 double bed' },
     singleDuvetCover: 1,
     doubleDuvetCover: 1,
     singleMattressCover: 1,
@@ -89,8 +160,8 @@ const roomTypeSupplyRules = {
     bathMat: 1,
   },
   '4 BUNK': {
-    capacity: '4명',
-    bedSetup: '싱글 2층침대 2개',
+    capacity: { ko: '4명', en: '4 people' },
+    bedSetup: { ko: '싱글 2층침대 2개', en: '2 single bunk beds' },
     singleDuvetCover: 4,
     doubleDuvetCover: 0,
     singleMattressCover: 4,
@@ -100,8 +171,8 @@ const roomTypeSupplyRules = {
     bathMat: 1,
   },
   'STANDARD FAMILY': {
-    capacity: '4명',
-    bedSetup: '더블베드 2',
+    capacity: { ko: '4명', en: '4 people' },
+    bedSetup: { ko: '더블베드 2', en: '2 double beds' },
     singleDuvetCover: 0,
     doubleDuvetCover: 2,
     singleMattressCover: 0,
@@ -118,7 +189,7 @@ function normalizeRoomType(roomType = '') {
 
 function getRoomFloor(roomNumber = '') {
   const floor = String(roomNumber).trim().charAt(0)
-  return floor ? `${floor}층` : '미지정'
+  return floor || ''
 }
 
 function createSupplyTotals() {
@@ -131,17 +202,24 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [checkedRooms, setCheckedRooms] = useState(() => new Set())
   const [activeCategory, setActiveCategory] = useState('rooms')
+  const [language, setLanguage] = useState('ko')
+  const t = translations[language]
+  const formatter = useMemo(() => new Intl.DateTimeFormat(t.locale, {
+    timeZone: 'Asia/Seoul',
+    dateStyle: 'full',
+    timeStyle: 'short',
+  }), [t.locale])
 
-  async function fetchAssignment(forceRefresh = false) {
+  const fetchAssignment = useCallback(async (forceRefresh = false) => {
     const response = await fetch(`/api/cleaning-assignment${forceRefresh ? '?refresh=true' : ''}`)
     const data = await response.json()
 
     if (!response.ok) {
-      throw new Error(data.message || '청소 배정 정보를 불러오지 못했습니다.')
+      throw new Error(data.message || t.loadErrorFallback)
     }
 
     return data
-  }
+  }, [t.loadErrorFallback])
 
   async function refreshAssignment() {
     setLoading(true)
@@ -173,7 +251,7 @@ function App() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [fetchAssignment])
 
   const staffNames = useMemo(() => {
     if (!assignment?.byStaff) return []
@@ -218,8 +296,8 @@ function App() {
         byRoomType[roomType] = {
           roomType,
           count: 0,
-          capacity: rule.capacity,
-          bedSetup: rule.bedSetup,
+          capacity: rule.capacity[language],
+          bedSetup: rule.bedSetup[language],
           totals: createSupplyTotals(),
         }
       }
@@ -252,7 +330,7 @@ function App() {
       )),
       unmatchedRoomTypes: [...unmatchedRoomTypes].sort(),
     }
-  }, [assignment])
+  }, [assignment, language])
 
   function toggleRoom(room) {
     const roomKey = getRoomKey(room)
@@ -277,7 +355,7 @@ function App() {
           type="checkbox"
           checked={isChecked}
           onChange={() => toggleRoom(room)}
-          aria-label={`${room.roomNumber} ${room.roomType} 완료`}
+          aria-label={t.completedLabel(room)}
         />
       </label>
     )
@@ -287,60 +365,78 @@ function App() {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Cleaning Supervisor</p>
-          <h1>객실 청소 배정</h1>
+          <p className="eyebrow">{t.productName}</p>
+          <h1>{t.title}</h1>
           <p className="subtle">
-            한국시간 {assignment?.date || '오늘'} 기준 Google Spreadsheet 실시간 데이터
+            {t.subtitle(assignment?.date)}
           </p>
         </div>
-        <button type="button" className="refresh-button" onClick={refreshAssignment}>
-          새로고침
-        </button>
+        <div className="topbar-actions">
+          <div className="language-toggle" aria-label="Language">
+            <button
+              type="button"
+              className={language === 'ko' ? 'active' : ''}
+              onClick={() => setLanguage('ko')}
+            >
+              한국어
+            </button>
+            <button
+              type="button"
+              className={language === 'en' ? 'active' : ''}
+              onClick={() => setLanguage('en')}
+            >
+              English
+            </button>
+          </div>
+          <button type="button" className="refresh-button" onClick={refreshAssignment}>
+            {t.refresh}
+          </button>
+        </div>
       </header>
 
-      <nav className="category-tabs" aria-label="카테고리">
+      <nav className="category-tabs" aria-label="Category">
         <button
           type="button"
           className={activeCategory === 'rooms' ? 'active' : ''}
           onClick={() => setActiveCategory('rooms')}
         >
-          객실 청소배정
+          {t.roomsTab}
         </button>
         <button
           type="button"
           className={activeCategory === 'items' ? 'active' : ''}
           onClick={() => setActiveCategory('items')}
         >
-          필요 품목 갯수
+          {t.itemsTab}
         </button>
       </nav>
 
       {error && (
         <section className="notice" role="alert">
-          <strong>데이터를 읽을 수 없습니다.</strong>
+          <strong>{t.loadErrorTitle}</strong>
           <span>{error}</span>
         </section>
       )}
 
       {loading && (
         <section className="notice">
-          <strong>불러오는 중</strong>
-          <span>스프레드시트의 날짜 열, 객실 정보, 셀 배경색을 확인하고 있습니다.</span>
+          <strong>{t.loadingTitle}</strong>
+          <span>{t.loadingMessage}</span>
         </section>
       )}
 
       {activeCategory === 'rooms' && assignment && (
-        <section className="summary-strip" aria-label="요약">
+        <section className="summary-strip" aria-label="Summary">
           <div>
-            <span>시트</span>
+            <span>{t.sheet}</span>
             <strong>{assignment.sheetTitle}</strong>
           </div>
           <div>
-            <span>총 청소 객실</span>
+            <span>{t.totalCleaningRooms}</span>
             <strong>{assignment.total}</strong>
           </div>
           <div>
-            <span>마지막 갱신</span>
+            <span>{t.lastUpdated}</span>
             <strong>{formatter.format(new Date(assignment.updatedAt))}</strong>
           </div>
         </section>
@@ -350,8 +446,8 @@ function App() {
         <div className="container-grid">
           <section className="container-panel">
             <div className="panel-heading">
-              <p className="container-label">컨테이너 1</p>
-              <h2>오늘 청소해야 하는 객실 목록</h2>
+              <p className="container-label">{t.containerOne}</p>
+              <h2>{t.todayRooms}</h2>
             </div>
 
             <div className="room-list">
@@ -364,7 +460,7 @@ function App() {
                   {completedRooms.length > 0 && (
                     <div className="room-section completed-room-section">
                       <div className="room-section-heading">
-                        <span>체크된 객실</span>
+                        <span>{t.checkedRooms}</span>
                         <strong>{completedRooms.length}</strong>
                       </div>
                       {completedRooms.map((room) => renderRoomRow(room, true))}
@@ -372,7 +468,7 @@ function App() {
                   )}
                 </>
               ) : (
-                <p className="empty">오늘 청소 대상 객실이 없습니다.</p>
+                <p className="empty">{t.noCleaningRooms}</p>
               )}
             </div>
 
@@ -384,7 +480,7 @@ function App() {
                 </div>
               ))}
               <div className="total-row">
-                <span>TOTAL:</span>
+                <span>{t.total}:</span>
                 <strong>{assignment.total}</strong>
               </div>
             </div>
@@ -392,8 +488,8 @@ function App() {
 
           <section className="container-panel">
             <div className="panel-heading">
-              <p className="container-label">컨테이너 2</p>
-              <h2>직원별 청소 배정 리스트</h2>
+              <p className="container-label">{t.containerTwo}</p>
+              <h2>{t.staffAssignments}</h2>
             </div>
 
             <div className="staff-list">
@@ -408,7 +504,7 @@ function App() {
                   ))}
                 </section>
               )) : (
-                <p className="empty">직원 배정 내역이 없습니다.</p>
+                <p className="empty">{t.noStaffAssignments}</p>
               )}
             </div>
           </section>
@@ -419,13 +515,13 @@ function App() {
         <div className="item-count-layout">
           <section className="container-panel">
             <div className="panel-heading">
-              <p className="container-label">필요 품목 갯수</p>
-              <h2>전체 품목 합계</h2>
+              <p className="container-label">{t.supplyCount}</p>
+              <h2>{t.totalSupplyCount}</h2>
             </div>
             <div className="item-total-grid">
               {supplyColumns.map((column) => (
                 <div className="item-total" key={column.key}>
-                  <span>{column.label}</span>
+                  <span>{column.label[language]}</span>
                   <strong>{supplySummary.totals[column.key]}</strong>
                 </div>
               ))}
@@ -434,24 +530,24 @@ function App() {
 
           <section className="container-panel">
             <div className="panel-heading">
-              <p className="container-label">Floor</p>
-              <h2>층별 필요 품목</h2>
+              <p className="container-label">{t.floor}</p>
+              <h2>{t.floorSupplyCount}</h2>
             </div>
             <div className="item-table-wrap">
               <table className="item-table floor-item-table">
                 <thead>
                   <tr>
-                    <th>층</th>
-                    <th>객실</th>
+                    <th>{t.floor}</th>
+                    <th>{t.rooms}</th>
                     {supplyColumns.map((column) => (
-                      <th key={column.key}>{column.label}</th>
+                      <th key={column.key}>{column.label[language]}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {supplySummary.byFloor.map((floor) => (
                     <tr key={floor.floor}>
-                      <td>{floor.floor}</td>
+                      <td>{floor.floor ? t.floorLabel(floor.floor) : t.unspecified}</td>
                       <td>{floor.count}</td>
                       {supplyColumns.map((column) => (
                         <td key={column.key}>{floor.totals[column.key]}</td>
@@ -465,19 +561,19 @@ function App() {
 
           <section className="container-panel">
             <div className="panel-heading">
-              <p className="container-label">Room Type</p>
-              <h2>타입별 품목 계산</h2>
+              <p className="container-label">{t.roomType}</p>
+              <h2>{t.roomTypeSupplyCount}</h2>
             </div>
             <div className="item-table-wrap">
               <table className="item-table">
                 <thead>
                   <tr>
-                    <th>Room Type</th>
-                    <th>객실</th>
-                    <th>기준 인원</th>
-                    <th>침대 구성</th>
+                    <th>{t.roomType}</th>
+                    <th>{t.rooms}</th>
+                    <th>{t.capacity}</th>
+                    <th>{t.bedSetup}</th>
                     {supplyColumns.map((column) => (
-                      <th key={column.key}>{column.label}</th>
+                      <th key={column.key}>{column.label[language]}</th>
                     ))}
                   </tr>
                 </thead>
@@ -500,7 +596,7 @@ function App() {
 
           {supplySummary.unmatchedRoomTypes.length > 0 && (
             <section className="notice" role="alert">
-              <strong>품목 기준이 없는 Room Type이 있습니다.</strong>
+              <strong>{t.missingRuleTitle}</strong>
               <span>{supplySummary.unmatchedRoomTypes.join(', ')}</span>
             </section>
           )}
