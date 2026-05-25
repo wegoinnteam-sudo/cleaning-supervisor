@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
+const ASSIGNMENT_REFRESH_INTERVAL_MS = 10_000
+
 const translations = {
   ko: {
     locale: 'ko-KR',
@@ -227,7 +229,9 @@ function App() {
   }), [t.locale])
 
   const fetchAssignment = useCallback(async (forceRefresh = false) => {
-    const response = await fetch(`/api/cleaning-assignment${forceRefresh ? '?refresh=true' : ''}`)
+    const response = await fetch(`/api/cleaning-assignment${forceRefresh ? '?refresh=true' : ''}`, {
+      cache: 'no-store',
+    })
     const data = await response.json()
 
     if (!response.ok) {
@@ -279,7 +283,7 @@ function App() {
   useEffect(() => {
     let ignore = false
 
-    fetchAssignment()
+    fetchAssignment(true)
       .then((data) => {
         if (!ignore) setAssignment(data)
       })
@@ -294,6 +298,44 @@ function App() {
       ignore = true
     }
   }, [fetchAssignment])
+
+  useEffect(() => {
+    if (activeCategory !== 'rooms') return undefined
+
+    let ignore = false
+    let refreshInProgress = false
+
+    async function syncAssignment() {
+      if (document.visibilityState === 'hidden' || refreshInProgress) return
+
+      refreshInProgress = true
+
+      try {
+        const data = await fetchAssignment(true)
+        if (!ignore) {
+          setAssignment(data)
+          setError('')
+        }
+      } catch (loadError) {
+        if (!ignore) setError(loadError.message)
+      } finally {
+        refreshInProgress = false
+      }
+    }
+
+    const intervalId = window.setInterval(syncAssignment, ASSIGNMENT_REFRESH_INTERVAL_MS)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') syncAssignment()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      ignore = true
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [activeCategory, fetchAssignment])
 
   useEffect(() => {
     if (!assignment?.date) return
