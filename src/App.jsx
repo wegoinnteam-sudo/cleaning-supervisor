@@ -185,6 +185,17 @@ const roomTypeSupplyRules = {
     towel: 8,
     bathMat: 1,
   },
+  DELUXE: {
+    capacity: { ko: '4명', en: '4 people' },
+    bedSetup: { ko: '더블베드 2', en: '2 double beds' },
+    singleDuvetCover: 0,
+    doubleDuvetCover: 2,
+    singleMattressCover: 0,
+    doubleMattressCover: 2,
+    pillowCover: 4,
+    towel: 8,
+    bathMat: 1,
+  },
 }
 
 function normalizeRoomType(roomType = '') {
