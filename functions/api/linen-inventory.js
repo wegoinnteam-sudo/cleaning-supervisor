@@ -139,6 +139,25 @@ function getSpreadsheetId(env) {
   return env.GOOGLE_SPREADSHEET_ID || DEFAULT_SPREADSHEET_ID
 }
 
+
+function getEnvDiagnostics(env) {
+  const serviceEmail = env.GOOGLE_SERVICE_ACCOUNT_EMAIL || ''
+  const privateKey = env.GOOGLE_PRIVATE_KEY || ''
+
+  return {
+    hasApiKey: Boolean(env.GOOGLE_API_KEY),
+    hasServiceEmail: Boolean(serviceEmail),
+    serviceEmailLooksValid: /^[^@]+@[^@]+\.iam\.gserviceaccount\.com$/.test(serviceEmail),
+    hasPrivateKey: Boolean(privateKey),
+    privateKeyLength: privateKey.length,
+    privateKeyHasBegin: privateKey.includes('BEGIN PRIVATE KEY'),
+    privateKeyHasEnd: privateKey.includes('END PRIVATE KEY'),
+    privateKeyHasEscapedNewlines: privateKey.includes('\\n'),
+    privateKeyHasRealNewlines: privateKey.includes('\n'),
+    configuredLinenSheetName: env.GOOGLE_LINEN_SHEET_NAME || env.GOOGLE_INVENTORY_SHEET_NAME || '',
+  }
+}
+
 function getTodayInKorea(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: KOREA_TIME_ZONE,
@@ -417,7 +436,29 @@ async function saveLinenInventory(env, { requiredQuantities = {}, receivedInputs
   }
 }
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ request, env }) {
+  const url = new URL(request.url)
+
+  if (url.searchParams.get('debug') === 'true') {
+    const diagnostics = getEnvDiagnostics(env)
+
+    try {
+      const inventory = await getLinenInventory(env)
+      return json({
+        ...diagnostics,
+        linenReadOk: true,
+        sheetTitle: inventory.sheetTitle,
+        date: inventory.date,
+      })
+    } catch (error) {
+      return json({
+        ...diagnostics,
+        linenReadOk: false,
+        message: error.message,
+      }, 500)
+    }
+  }
+
   try {
     return json(await getLinenInventory(env))
   } catch (error) {
