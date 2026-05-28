@@ -73,20 +73,36 @@ function normalizePrivateKey(privateKey = '') {
   ].join('\n')
 }
 
+function getServiceAccountEmail(env) {
+  return env.GOOGLE_SERVICE_ACCOUNT_EMAIL
+    || env.GOOGLE_CLIENT_EMAIL
+    || env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL
+    || env.CLIENT_EMAIL
+    || ''
+}
+
+function getPrivateKey(env) {
+  return env.GOOGLE_PRIVATE_KEY
+    || env.PRIVATE_KEY
+    || ''
+}
+
 async function createServiceAccountToken(env, scope) {
-  if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_PRIVATE_KEY) return null
+  const serviceAccountEmail = getServiceAccountEmail(env)
+  const privateKey = getPrivateKey(env)
+  if (!serviceAccountEmail || !privateKey) return null
 
   const now = Math.floor(Date.now() / 1000)
   const header = base64UrlEncode(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
   const payload = base64UrlEncode(JSON.stringify({
-    iss: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    iss: serviceAccountEmail,
     scope,
     aud: GOOGLE_TOKEN_URL,
     exp: now + 3600,
     iat: now,
   }))
   const unsignedToken = `${header}.${payload}`
-  const pem = normalizePrivateKey(env.GOOGLE_PRIVATE_KEY)
+  const pem = normalizePrivateKey(privateKey)
   const keyBody = pem
     .replace('-----BEGIN PRIVATE KEY-----', '')
     .replace('-----END PRIVATE KEY-----', '')
@@ -141,14 +157,22 @@ function getSpreadsheetId(env) {
 
 
 function getEnvDiagnostics(env) {
-  const serviceEmail = env.GOOGLE_SERVICE_ACCOUNT_EMAIL || ''
-  const privateKey = env.GOOGLE_PRIVATE_KEY || ''
+  const serviceEmail = getServiceAccountEmail(env)
+  const privateKey = getPrivateKey(env)
 
   return {
     hasApiKey: Boolean(env.GOOGLE_API_KEY),
     hasServiceEmail: Boolean(serviceEmail),
+    serviceEmailSource: env.GOOGLE_SERVICE_ACCOUNT_EMAIL ? 'GOOGLE_SERVICE_ACCOUNT_EMAIL'
+      : env.GOOGLE_CLIENT_EMAIL ? 'GOOGLE_CLIENT_EMAIL'
+        : env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL ? 'GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL'
+          : env.CLIENT_EMAIL ? 'CLIENT_EMAIL'
+            : '',
     serviceEmailLooksValid: /^[^@]+@[^@]+\.iam\.gserviceaccount\.com$/.test(serviceEmail),
     hasPrivateKey: Boolean(privateKey),
+    privateKeySource: env.GOOGLE_PRIVATE_KEY ? 'GOOGLE_PRIVATE_KEY'
+      : env.PRIVATE_KEY ? 'PRIVATE_KEY'
+        : '',
     privateKeyLength: privateKey.length,
     privateKeyHasBegin: privateKey.includes('BEGIN PRIVATE KEY'),
     privateKeyHasEnd: privateKey.includes('END PRIVATE KEY'),
@@ -290,7 +314,7 @@ async function fetchSheets(spreadsheetPath, params, env, options = {}) {
   } else if (env.GOOGLE_API_KEY && !options.requireAuth) {
     url.searchParams.set('key', env.GOOGLE_API_KEY)
   } else {
-    throw new Error('Google Sheet 저장에는 GOOGLE_SERVICE_ACCOUNT_EMAIL과 실제 GOOGLE_PRIVATE_KEY가 필요합니다.')
+    throw new Error('Google Sheet 저장에는 GOOGLE_SERVICE_ACCOUNT_EMAIL 또는 GOOGLE_CLIENT_EMAIL, 그리고 GOOGLE_PRIVATE_KEY 또는 PRIVATE_KEY가 필요합니다.')
   }
 
   const response = await fetch(url, {
