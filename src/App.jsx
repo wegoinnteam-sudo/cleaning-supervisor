@@ -12,10 +12,28 @@ const translations = {
     refresh: '새로고침',
     roomsTab: '객실 청소배정',
     itemsTab: '필요 품목 갯수',
+    linenTab: '린넨 재고파악',
     loadErrorTitle: '데이터를 읽을 수 없습니다.',
     loadErrorFallback: '청소 배정 정보를 불러오지 못했습니다.',
     checkSyncErrorTitle: '체크 상태를 저장할 수 없습니다.',
     checkSyncErrorFallback: '공유 체크 상태를 저장하지 못했습니다.',
+    linenSyncErrorTitle: '린넨 재고를 저장할 수 없습니다.',
+    linenSyncErrorFallback: '린넨 재고 정보를 저장하지 못했습니다.',
+    linenInventory: '린넨 재고파악',
+    todayLaundryNeed: '오늘 세탁 필요 수량',
+    laundryIncoming: '세탁업체 입고 입력',
+    finalInventory: '오늘 최종 재고',
+    itemName: '품목',
+    requiredQuantity: '세탁필요수량',
+    inputQuantity: '입력',
+    incomingQuantity: '들어온수량',
+    currentQuantity: '현재수량',
+    currentStock: '현재재고',
+    saveTodayLinen: '제출하기',
+    saving: '저장 중',
+    saved: '저장 완료',
+    packUnit: (size) => `팩 (${size}장/팩)`,
+    eaUnit: 'EA',
     loadingTitle: '불러오는 중',
     loadingMessage: '스프레드시트의 날짜 열, 객실 정보, 셀 배경색을 확인하고 있습니다.',
     sheet: '시트',
@@ -51,10 +69,28 @@ const translations = {
     refresh: 'Refresh',
     roomsTab: 'Room Cleaning Assignment',
     itemsTab: 'Required Item Count',
+    linenTab: 'Linen Inventory',
     loadErrorTitle: 'Unable to read data.',
     loadErrorFallback: 'Unable to load cleaning assignment data.',
     checkSyncErrorTitle: 'Unable to save check status.',
     checkSyncErrorFallback: 'Unable to save shared check status.',
+    linenSyncErrorTitle: 'Unable to save linen inventory.',
+    linenSyncErrorFallback: 'Unable to save linen inventory data.',
+    linenInventory: 'Linen Inventory',
+    todayLaundryNeed: 'Today Laundry Need',
+    laundryIncoming: 'Laundry Incoming Entry',
+    finalInventory: 'Final Inventory Today',
+    itemName: 'Item',
+    requiredQuantity: 'Required Quantity',
+    inputQuantity: 'Input',
+    incomingQuantity: 'Incoming Quantity',
+    currentQuantity: 'Current Quantity',
+    currentStock: 'Current Stock',
+    saveTodayLinen: 'Submit',
+    saving: 'Saving',
+    saved: 'Saved',
+    packUnit: (size) => `Pack (${size} each)`,
+    eaUnit: 'EA',
     loadingTitle: 'Loading',
     loadingMessage: 'Checking the spreadsheet date column, room information, and cell background colors.',
     sheet: 'Sheet',
@@ -97,6 +133,21 @@ const supplyColumns = [
   { key: 'towel', label: { ko: '수건', en: 'Towels' } },
   { key: 'bathMat', label: { ko: '발매트', en: 'Bath Mat' } },
 ]
+
+const linenInputSettings = {
+  singleDuvetCover: { packSize: 5 },
+  doubleDuvetCover: { packSize: 5 },
+  singleMattressCover: { packSize: null },
+  doubleMattressCover: { packSize: null },
+  pillowCover: { packSize: 50 },
+  bathMat: { packSize: 20 },
+}
+
+const linenColumns = supplyColumns.filter((column) => column.key in linenInputSettings)
+
+function createLinenInputs() {
+  return Object.fromEntries(linenColumns.map((column) => [column.key, '']))
+}
 
 const roomTypeSupplyRules = {
   SINGLE: {
@@ -217,6 +268,11 @@ function App() {
   const [assignment, setAssignment] = useState(null)
   const [error, setError] = useState('')
   const [checkError, setCheckError] = useState('')
+  const [linenError, setLinenError] = useState('')
+  const [linenInventory, setLinenInventory] = useState(null)
+  const [linenInputs, setLinenInputs] = useState(createLinenInputs)
+  const [linenSaving, setLinenSaving] = useState(false)
+  const [linenSavedAt, setLinenSavedAt] = useState('')
   const [loading, setLoading] = useState(true)
   const [checkedRooms, setCheckedRooms] = useState(() => new Set())
   const [activeCategory, setActiveCategory] = useState('rooms')
@@ -266,6 +322,17 @@ function App() {
 
     return data.checkedRoomKeys || []
   }, [t.checkSyncErrorFallback])
+
+  const fetchLinenInventory = useCallback(async () => {
+    const response = await fetch('/api/linen-inventory', { cache: 'no-store' })
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.message || t.linenSyncErrorFallback)
+    }
+
+    return data
+  }, [t.linenSyncErrorFallback])
 
   async function refreshAssignment() {
     setLoading(true)
@@ -358,6 +425,27 @@ function App() {
     }
   }, [assignment?.date, fetchRoomChecks])
 
+  useEffect(() => {
+    if (activeCategory !== 'linen') return undefined
+
+    let ignore = false
+
+    fetchLinenInventory()
+      .then((data) => {
+        if (!ignore) {
+          setLinenInventory(data)
+          setLinenError('')
+        }
+      })
+      .catch((loadError) => {
+        if (!ignore) setLinenError(loadError.message)
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [activeCategory, fetchLinenInventory])
+
   const staffNames = useMemo(() => {
     if (!assignment?.byStaff) return []
     return Object.keys(assignment.byStaff).sort((left, right) => (
@@ -381,6 +469,13 @@ function App() {
     if (!assignment?.rooms) return []
     return assignment.rooms.filter((room) => checkedRooms.has(getRoomKey(room)))
   }, [assignment, checkedRooms])
+
+  const linenIncomingSummary = useMemo(() => Object.fromEntries(linenColumns.map((column) => {
+    const inputValue = Number(linenInputs[column.key])
+    const safeInputValue = Number.isFinite(inputValue) && inputValue >= 0 ? inputValue : 0
+    const packSize = linenInputSettings[column.key].packSize
+    return [column.key, packSize ? safeInputValue * packSize : safeInputValue]
+  })), [linenInputs])
 
   const supplySummary = useMemo(() => {
     const totals = createSupplyTotals()
@@ -436,6 +531,47 @@ function App() {
       unmatchedRoomTypes: [...unmatchedRoomTypes].sort(),
     }
   }, [assignment, language])
+
+  function updateLinenInput(key, value) {
+    setLinenInputs((current) => ({
+      ...current,
+      [key]: value,
+    }))
+    setLinenSavedAt('')
+  }
+
+  async function saveTodayLinen() {
+    setLinenSaving(true)
+    setLinenError('')
+    setLinenSavedAt('')
+
+    try {
+      const requiredQuantities = Object.fromEntries(linenColumns.map((column) => [
+        column.key,
+        supplySummary.totals[column.key] || 0,
+      ]))
+      const response = await fetch('/api/linen-inventory', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          requiredQuantities,
+          receivedInputs: linenInputs,
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || t.linenSyncErrorFallback)
+      }
+
+      setLinenInventory(data)
+      setLinenSavedAt(new Date().toISOString())
+    } catch (saveError) {
+      setLinenError(saveError.message)
+    } finally {
+      setLinenSaving(false)
+    }
+  }
 
   async function toggleRoom(room) {
     if (!assignment?.date) return
@@ -531,6 +667,13 @@ function App() {
         >
           {t.itemsTab}
         </button>
+        <button
+          type="button"
+          className={activeCategory === 'linen' ? 'active' : ''}
+          onClick={() => setActiveCategory('linen')}
+        >
+          {t.linenTab}
+        </button>
       </nav>
 
       {error && (
@@ -544,6 +687,13 @@ function App() {
         <section className="notice" role="alert">
           <strong>{t.checkSyncErrorTitle}</strong>
           <span>{checkError}</span>
+        </section>
+      )}
+
+      {linenError && (
+        <section className="notice" role="alert">
+          <strong>{t.linenSyncErrorTitle}</strong>
+          <span>{linenError}</span>
         </section>
       )}
 
@@ -635,6 +785,116 @@ function App() {
               )) : (
                 <p className="empty">{t.noStaffAssignments}</p>
               )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {activeCategory === 'linen' && assignment && (
+        <div className="linen-layout">
+          <section className="container-panel">
+            <div className="panel-heading">
+              <p className="container-label">{t.linenInventory}</p>
+              <h2>{t.todayLaundryNeed}</h2>
+            </div>
+            <div className="item-total-grid linen-total-grid">
+              {linenColumns.map((column) => (
+                <div className="item-total" key={column.key}>
+                  <span>{column.label[language]}</span>
+                  <strong>{supplySummary.totals[column.key]}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="container-panel">
+            <div className="panel-heading linen-action-heading">
+              <div>
+                <p className="container-label">{t.laundryIncoming}</p>
+                <h2>{t.incomingQuantity}</h2>
+              </div>
+              <button
+                type="button"
+                className="refresh-button"
+                onClick={saveTodayLinen}
+                disabled={linenSaving}
+              >
+                {linenSaving ? t.saving : t.saveTodayLinen}
+              </button>
+            </div>
+            <div className="item-table-wrap">
+              <table className="item-table linen-input-table">
+                <thead>
+                  <tr>
+                    <th>{t.itemName}</th>
+                    <th>{t.inputQuantity}</th>
+                    <th>{t.incomingQuantity}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linenColumns.map((column) => {
+                    const packSize = linenInputSettings[column.key].packSize
+                    return (
+                      <tr key={column.key}>
+                        <td>{column.label[language]}</td>
+                        <td>
+                          <label className="linen-input-cell">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={linenInputs[column.key]}
+                              onChange={(event) => updateLinenInput(column.key, event.target.value)}
+                            />
+                            <span>{packSize ? t.packUnit(packSize) : t.eaUnit}</span>
+                          </label>
+                        </td>
+                        <td>{linenIncomingSummary[column.key]}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {linenSavedAt && (
+              <div className="linen-save-status">
+                <strong>{t.saved}</strong>
+                <span>{formatter.format(new Date(linenSavedAt))}</span>
+              </div>
+            )}
+          </section>
+
+          <section className="container-panel">
+            <div className="panel-heading">
+              <p className="container-label">{linenInventory?.sheetTitle || t.sheet}</p>
+              <h2>{t.finalInventory}</h2>
+            </div>
+            <div className="item-table-wrap">
+              <table className="item-table linen-stock-table">
+                <thead>
+                  <tr>
+                    <th>{t.itemName}</th>
+                    <th>{t.currentQuantity}</th>
+                    <th>{t.requiredQuantity}</th>
+                    <th>{t.incomingQuantity}</th>
+                    <th>{t.currentStock}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linenColumns.map((column) => {
+                    const inventory = linenInventory?.inventory?.[column.key] || {}
+                    return (
+                      <tr key={column.key}>
+                        <td>{column.label[language]}</td>
+                        <td>{inventory.currentQuantity ?? '-'}</td>
+                        <td>{inventory.requiredQuantity ?? supplySummary.totals[column.key]}</td>
+                        <td>{inventory.incomingQuantity ?? linenIncomingSummary[column.key]}</td>
+                        <td>{inventory.currentStock ?? '-'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </section>
         </div>

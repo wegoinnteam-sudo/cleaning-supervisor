@@ -89,11 +89,35 @@ function countByRoomType(rooms) {
   }, {})
 }
 
+function normalizePrivateKey(privateKey = '') {
+  const normalizedKey = privateKey.replace(/\\n/g, '\n').trim()
+  if (normalizedKey.includes('\n')) return normalizedKey
+
+  const keyBody = normalizedKey
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s+/g, '')
+
+  if (!keyBody) return normalizedKey
+
+  const keyLines = keyBody.match(/.{1,64}/g) || []
+  return [
+    '-----BEGIN PRIVATE KEY-----',
+    ...keyLines,
+    '-----END PRIVATE KEY-----',
+  ].join('\n')
+}
 function getGoogleAuth() {
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+  const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || ''
+  const privateKey = process.env.GOOGLE_PRIVATE_KEY || ''
+  const hasUsableServiceAccount = /^[^@]+@[^@]+\.iam\.gserviceaccount\.com$/.test(serviceAccountEmail)
+    && privateKey.includes('BEGIN PRIVATE KEY')
+    && privateKey.includes('END PRIVATE KEY')
+
+  if (hasUsableServiceAccount) {
     return new google.auth.JWT({
-      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      email: serviceAccountEmail,
+      key: normalizePrivateKey(privateKey),
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     })
   }

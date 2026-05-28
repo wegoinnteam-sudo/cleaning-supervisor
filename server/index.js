@@ -3,6 +3,7 @@ import cron from 'node-cron'
 import dotenv from 'dotenv'
 import express from 'express'
 import { buildCleaningAssignment } from './services/cleaningAssignment.js'
+import { getLinenInventory, saveLinenInventory } from './services/linenInventory.js'
 
 dotenv.config()
 
@@ -12,6 +13,7 @@ let cachedAssignment = null
 let lastError = null
 
 app.use(cors())
+app.use(express.json())
 
 async function refreshAssignment() {
   try {
@@ -45,6 +47,26 @@ app.get('/api/cleaning-assignment', async (request, response) => {
     response.status(500).json({
       message: error.message,
       lastError: lastError?.message || null,
+    })
+  }
+})
+
+app.get('/api/linen-inventory', async (request, response) => {
+  try {
+    response.json(await getLinenInventory())
+  } catch (error) {
+    response.status(500).json({
+      message: error.message,
+    })
+  }
+})
+
+app.post('/api/linen-inventory', async (request, response) => {
+  try {
+    response.json(await saveLinenInventory(request.body || {}))
+  } catch (error) {
+    response.status(500).json({
+      message: error.message,
     })
   }
 })
