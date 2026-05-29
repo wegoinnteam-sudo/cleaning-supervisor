@@ -9,12 +9,12 @@ let cachedReadToken = null
 let cachedWriteToken = null
 
 const linenItems = [
-  { key: 'singleDuvetCover', labels: ['싱글 이불커버', '싱글이불커버', 'single duvet cover'], packSize: 5 },
-  { key: 'doubleDuvetCover', labels: ['더블 이불커버', '더블이불커버', 'double duvet cover'], packSize: 5 },
-  { key: 'singleMattressCover', labels: ['싱글 매트리스커버', '싱글매트리스커버', '싱글 배트리스커버', 'single mattress cover'], packSize: null },
-  { key: 'doubleMattressCover', labels: ['더블 매트리스커버', '더블매트리스커버', 'double mattress cover'], packSize: null },
-  { key: 'pillowCover', labels: ['베개커버', 'pillow cover'], packSize: 50 },
-  { key: 'bathMat', labels: ['발매트', 'bath mat'], packSize: 20 },
+  { key: 'singleDuvetCover', labels: ['싱글 이불커버', '싱글이불커버', 'single duvet cover'], packSize: 5, fixedQuantity: 39 },
+  { key: 'doubleDuvetCover', labels: ['더블 이불커버', '더블이불커버', 'double duvet cover'], packSize: 5, fixedQuantity: 28 },
+  { key: 'singleMattressCover', labels: ['싱글 매트리스커버', '싱글매트리스커버', '싱글 배트리스커버', 'single mattress cover'], packSize: null, fixedQuantity: 39 },
+  { key: 'doubleMattressCover', labels: ['더블 매트리스커버', '더블매트리스커버', 'double mattress cover'], packSize: null, fixedQuantity: 28 },
+  { key: 'pillowCover', labels: ['베개커버', 'pillow cover'], packSize: 50, fixedQuantity: 95 },
+  { key: 'bathMat', labels: ['발매트', 'bath mat'], packSize: 20, fixedQuantity: 43 },
 ]
 
 const metricAliases = {
@@ -462,7 +462,7 @@ async function saveLinenInventory(env, { requiredQuantities = {}, receivedInputs
     if (totalColumn !== undefined) {
       data.push({
         range: `${quoteSheetName(layout.sheetTitle)}!${columnToA1(totalColumn)}${layout.dateRowIndex + 1}`,
-        values: [[currentStock + requiredQuantity]],
+        values: [[currentStock + item.fixedQuantity]],
       })
     }
   })
