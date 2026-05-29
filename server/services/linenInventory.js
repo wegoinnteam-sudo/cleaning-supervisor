@@ -119,9 +119,21 @@ function normalizePrivateKey(privateKey = '') {
   ].join('\n')
 }
 
+function getPrivateKey() {
+  if (process.env.GOOGLE_PRIVATE_KEY_BASE64) {
+    return Buffer.from(process.env.GOOGLE_PRIVATE_KEY_BASE64, 'base64').toString('utf8').trim()
+  }
+
+  return process.env.GOOGLE_PRIVATE_KEY || process.env.PRIVATE_KEY || ''
+}
+
 function getGoogleAuth(scopes) {
-  const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || ''
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY || ''
+  const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
+    || process.env.GOOGLE_CLIENT_EMAIL
+    || process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL
+    || process.env.CLIENT_EMAIL
+    || ''
+  const privateKey = getPrivateKey()
   const hasUsableServiceAccount = /^[^@]+@[^@]+\.iam\.gserviceaccount\.com$/.test(serviceAccountEmail)
     && privateKey.includes('BEGIN PRIVATE KEY')
     && privateKey.includes('END PRIVATE KEY')

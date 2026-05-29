@@ -82,6 +82,10 @@ function getServiceAccountEmail(env) {
 }
 
 function getPrivateKey(env) {
+  if (env.GOOGLE_PRIVATE_KEY_BASE64) {
+    return atob(env.GOOGLE_PRIVATE_KEY_BASE64).trim()
+  }
+
   return env.GOOGLE_PRIVATE_KEY
     || env.PRIVATE_KEY
     || ''
@@ -171,8 +175,9 @@ function getEnvDiagnostics(env) {
     serviceEmailLooksValid: /^[^@]+@[^@]+\.iam\.gserviceaccount\.com$/.test(serviceEmail),
     hasPrivateKey: Boolean(privateKey),
     privateKeySource: env.GOOGLE_PRIVATE_KEY ? 'GOOGLE_PRIVATE_KEY'
-      : env.PRIVATE_KEY ? 'PRIVATE_KEY'
-        : '',
+      : env.GOOGLE_PRIVATE_KEY_BASE64 ? 'GOOGLE_PRIVATE_KEY_BASE64'
+        : env.PRIVATE_KEY ? 'PRIVATE_KEY'
+          : '',
     privateKeyLength: privateKey.length,
     privateKeyHasBegin: privateKey.includes('BEGIN PRIVATE KEY'),
     privateKeyHasEnd: privateKey.includes('END PRIVATE KEY'),

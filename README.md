@@ -76,6 +76,19 @@ GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@project.iam.gserviceaccount.com
 GOOGLE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n
 ```
 
+Cloudflare에서 줄바꿈이 있는 private key가 잡히지 않으면 아래처럼 base64 값으로 대신 설정할 수 있습니다.
+
+```text
+GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@project.iam.gserviceaccount.com
+GOOGLE_PRIVATE_KEY_BASE64=base64로_인코딩한_private_key
+```
+
+로컬에서 base64 값은 아래 명령으로 만들 수 있습니다.
+
+```bash
+node -e "import fs from 'fs'; import dotenv from 'dotenv'; const env = dotenv.parse(fs.readFileSync('.env')); process.stdout.write(Buffer.from(env.GOOGLE_PRIVATE_KEY || '', 'utf8').toString('base64'))"
+```
+
 객실 체크박스를 여러 사용자가 공유하려면 Cloudflare KV namespace를 만들고 Pages Function 바인딩을 추가합니다.
 
 ```text

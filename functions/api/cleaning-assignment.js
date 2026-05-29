@@ -45,20 +45,40 @@ function normalizePrivateKey(privateKey) {
   return privateKey.replace(/\\n/g, '\n')
 }
 
+function getServiceAccountEmail(env) {
+  return env.GOOGLE_SERVICE_ACCOUNT_EMAIL
+    || env.GOOGLE_CLIENT_EMAIL
+    || env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL
+    || env.CLIENT_EMAIL
+    || ''
+}
+
+function getPrivateKey(env) {
+  if (env.GOOGLE_PRIVATE_KEY_BASE64) {
+    return atob(env.GOOGLE_PRIVATE_KEY_BASE64).trim()
+  }
+
+  return env.GOOGLE_PRIVATE_KEY
+    || env.PRIVATE_KEY
+    || ''
+}
+
 async function createServiceAccountToken(env) {
-  if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_PRIVATE_KEY) return null
+  const serviceAccountEmail = getServiceAccountEmail(env)
+  const privateKey = getPrivateKey(env)
+  if (!serviceAccountEmail || !privateKey) return null
 
   const now = Math.floor(Date.now() / 1000)
   const header = base64UrlEncode(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
   const payload = base64UrlEncode(JSON.stringify({
-    iss: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    iss: serviceAccountEmail,
     scope: SHEETS_SCOPE,
     aud: GOOGLE_TOKEN_URL,
     exp: now + 3600,
     iat: now,
   }))
   const unsignedToken = `${header}.${payload}`
-  const pem = normalizePrivateKey(env.GOOGLE_PRIVATE_KEY)
+  const pem = normalizePrivateKey(privateKey)
   const keyBody = pem
     .replace('-----BEGIN PRIVATE KEY-----', '')
     .replace('-----END PRIVATE KEY-----', '')
