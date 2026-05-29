@@ -29,6 +29,7 @@ const translations = {
     incomingQuantity: '들어온수량',
     currentQuantity: '현재수량',
     currentStock: '현재재고',
+    totalQuantity: '총수량',
     saveTodayLinen: '제출하기',
     saving: '저장 중',
     saved: '저장 완료',
@@ -86,6 +87,7 @@ const translations = {
     incomingQuantity: 'Incoming Quantity',
     currentQuantity: 'Current Quantity',
     currentStock: 'Current Stock',
+    totalQuantity: 'Total Quantity',
     saveTodayLinen: 'Submit',
     saving: 'Saving',
     saved: 'Saved',
@@ -878,6 +880,7 @@ function App() {
                     <th>{t.requiredQuantity}</th>
                     <th>{t.incomingQuantity}</th>
                     <th>{t.currentStock}</th>
+                    <th>{t.totalQuantity}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -890,6 +893,7 @@ function App() {
                         <td>{inventory.requiredQuantity ?? supplySummary.totals[column.key]}</td>
                         <td>{inventory.incomingQuantity ?? linenIncomingSummary[column.key]}</td>
                         <td>{inventory.currentStock ?? '-'}</td>
+                        <td>{inventory.totalQuantity ?? '-'}</td>
                       </tr>
                     )
                   })}

@@ -42,6 +42,7 @@ const metricAliases = {
   requiredQuantity: ['세탁필요수량', '세탁 필요 수량'],
   incomingQuantity: ['들어온수량', '들어온 수량', '입고수량', '입고 수량'],
   currentStock: ['현재재고', '현제재고', '현재 재고', '현제 재고'],
+  totalQuantity: ['총수량', '총 수량'],
 }
 
 function getSpreadsheetId() {
@@ -306,6 +307,7 @@ function readInventoryValues(layout) {
       requiredQuantity: itemColumns.requiredQuantity === undefined ? null : toNumber(row[itemColumns.requiredQuantity]),
       incomingQuantity: itemColumns.incomingQuantity === undefined ? null : toNumber(row[itemColumns.incomingQuantity]),
       currentStock: itemColumns.currentStock === undefined ? null : toNumber(row[itemColumns.currentStock]),
+      totalQuantity: itemColumns.totalQuantity === undefined ? null : toNumber(row[itemColumns.totalQuantity]),
     }]
   }))
 }
@@ -341,8 +343,11 @@ export async function saveLinenInventory({ requiredQuantities = {}, receivedInpu
     const requiredColumn = itemColumns.requiredQuantity
     const incomingColumn = itemColumns.incomingQuantity
     const stockColumn = itemColumns.currentStock
+    const totalColumn = itemColumns.totalQuantity
     const requiredQuantity = toNumber(requiredQuantities[item.key])
     const incomingQuantity = incomingQuantities[item.key]
+    const currentQuantity = currentColumn === undefined ? 0 : toNumber(row[currentColumn])
+    const currentStock = currentQuantity + requiredQuantity + incomingQuantity
 
     if (requiredColumn !== undefined) {
       data.push({
@@ -359,16 +364,22 @@ export async function saveLinenInventory({ requiredQuantities = {}, receivedInpu
     }
 
     if (stockColumn !== undefined) {
-      const currentQuantity = currentColumn === undefined ? 0 : toNumber(row[currentColumn])
       data.push({
         range: `${quoteSheetName(layout.sheetTitle)}!${columnToA1(stockColumn)}${layout.dateRowIndex + 1}`,
-        values: [[currentQuantity + requiredQuantity + incomingQuantity]],
+        values: [[currentStock]],
+      })
+    }
+
+    if (totalColumn !== undefined) {
+      data.push({
+        range: `${quoteSheetName(layout.sheetTitle)}!${columnToA1(totalColumn)}${layout.dateRowIndex + 1}`,
+        values: [[currentStock + requiredQuantity]],
       })
     }
   })
 
   if (!data.length) {
-    throw new Error('저장할 세탁필요수량, 들어온수량 또는 현재재고 컬럼을 찾지 못했습니다.')
+    throw new Error('저장할 세탁필요수량, 들어온수량, 현재재고 또는 총수량 컬럼을 찾지 못했습니다.')
   }
 
   await sheets.spreadsheets.values.batchUpdate({
