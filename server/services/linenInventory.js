@@ -336,26 +336,39 @@ export async function saveLinenInventory({ requiredQuantities = {}, receivedInpu
 
   linenItems.forEach((item) => {
     const itemColumns = layout.columns[item.key] || {}
+    const row = layout.rows[layout.dateRowIndex] || []
+    const currentColumn = itemColumns.currentQuantity
     const requiredColumn = itemColumns.requiredQuantity
     const incomingColumn = itemColumns.incomingQuantity
+    const stockColumn = itemColumns.currentStock
+    const requiredQuantity = toNumber(requiredQuantities[item.key])
+    const incomingQuantity = incomingQuantities[item.key]
 
     if (requiredColumn !== undefined) {
       data.push({
         range: `${quoteSheetName(layout.sheetTitle)}!${columnToA1(requiredColumn)}${layout.dateRowIndex + 1}`,
-        values: [[toNumber(requiredQuantities[item.key])]],
+        values: [[requiredQuantity]],
       })
     }
 
     if (incomingColumn !== undefined) {
       data.push({
         range: `${quoteSheetName(layout.sheetTitle)}!${columnToA1(incomingColumn)}${layout.dateRowIndex + 1}`,
-        values: [[incomingQuantities[item.key]]],
+        values: [[incomingQuantity]],
+      })
+    }
+
+    if (stockColumn !== undefined) {
+      const currentQuantity = currentColumn === undefined ? 0 : toNumber(row[currentColumn])
+      data.push({
+        range: `${quoteSheetName(layout.sheetTitle)}!${columnToA1(stockColumn)}${layout.dateRowIndex + 1}`,
+        values: [[currentQuantity + requiredQuantity + incomingQuantity]],
       })
     }
   })
 
   if (!data.length) {
-    throw new Error('저장할 세탁필요수량 또는 들어온수량 컬럼을 찾지 못했습니다.')
+    throw new Error('저장할 세탁필요수량, 들어온수량 또는 현재재고 컬럼을 찾지 못했습니다.')
   }
 
   await sheets.spreadsheets.values.batchUpdate({
