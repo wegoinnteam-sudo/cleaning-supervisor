@@ -236,7 +236,11 @@ function normalizeLabel(value = '') {
 
 function toNumber(value) {
   const number = Number(value)
-  return Number.isFinite(number) && number >= 0 ? number : 0
+  return Number.isFinite(number) ? number : 0
+}
+
+function toNonNegativeNumber(value) {
+  return Math.max(0, toNumber(value))
 }
 
 function quoteSheetName(title) {
@@ -382,7 +386,7 @@ async function findInventoryLayout(spreadsheetId, date, env) {
 
 function buildIncomingQuantities(receivedInputs = {}) {
   return Object.fromEntries(linenItems.map((item) => {
-    const inputValue = toNumber(receivedInputs[item.key])
+    const inputValue = toNonNegativeNumber(receivedInputs[item.key])
     const quantity = item.packSize ? inputValue * item.packSize : inputValue
     return [item.key, quantity]
   }))
@@ -395,10 +399,10 @@ function readInventoryValues(layout) {
 
     return [item.key, {
       currentQuantity: itemColumns.currentQuantity === undefined ? null : toNumber(row[itemColumns.currentQuantity]),
-      requiredQuantity: itemColumns.requiredQuantity === undefined ? null : toNumber(row[itemColumns.requiredQuantity]),
-      incomingQuantity: itemColumns.incomingQuantity === undefined ? null : toNumber(row[itemColumns.incomingQuantity]),
-      currentStock: itemColumns.currentStock === undefined ? null : toNumber(row[itemColumns.currentStock]),
-      totalQuantity: itemColumns.totalQuantity === undefined ? null : toNumber(row[itemColumns.totalQuantity]),
+      requiredQuantity: itemColumns.requiredQuantity === undefined ? null : toNonNegativeNumber(row[itemColumns.requiredQuantity]),
+      incomingQuantity: itemColumns.incomingQuantity === undefined ? null : toNonNegativeNumber(row[itemColumns.incomingQuantity]),
+      currentStock: itemColumns.currentStock === undefined ? null : toNonNegativeNumber(row[itemColumns.currentStock]),
+      totalQuantity: itemColumns.totalQuantity === undefined ? null : toNonNegativeNumber(row[itemColumns.totalQuantity]),
     }]
   }))
 }
@@ -431,10 +435,10 @@ async function saveLinenInventory(env, { requiredQuantities = {}, receivedInputs
     const incomingColumn = itemColumns.incomingQuantity
     const stockColumn = itemColumns.currentStock
     const totalColumn = itemColumns.totalQuantity
-    const requiredQuantity = toNumber(requiredQuantities[item.key])
+    const requiredQuantity = toNonNegativeNumber(requiredQuantities[item.key])
     const incomingQuantity = incomingQuantities[item.key]
     const currentQuantity = currentColumn === undefined ? 0 : toNumber(row[currentColumn])
-    const currentStock = currentQuantity + requiredQuantity + incomingQuantity
+    const currentStock = Math.max(0, currentQuantity + requiredQuantity + incomingQuantity)
 
     if (requiredColumn !== undefined) {
       data.push({
