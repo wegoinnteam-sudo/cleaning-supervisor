@@ -3,6 +3,7 @@ import { google } from 'googleapis'
 const DEFAULT_SPREADSHEET_ID = '1ALRPlfA777W1KHiHycva9RuGrPAaSwLg1mJLWS5bJcU'
 const KOREA_TIME_ZONE = 'Asia/Seoul'
 const INVENTORY_RANGE = 'A1:ZZ1000'
+const METRIC_COLUMNS_PER_ITEM = 5
 
 const linenItems = [
   {
@@ -44,10 +45,10 @@ const linenItems = [
 ]
 
 const metricAliases = {
-  currentQuantity: ['현재수량', '현제수량'],
-  requiredQuantity: ['세탁필요수량', '세탁 필요 수량'],
+  currentQuantity: ['현재수량', '현제수량', '아침수량', '아침 수량'],
+  requiredQuantity: ['세탁필요수량', '세탁 필요 수량', '더티수량', '더티 수량'],
   incomingQuantity: ['들어온수량', '들어온 수량', '입고수량', '입고 수량'],
-  currentStock: ['현재재고', '현제재고', '현재 재고', '현제 재고'],
+  currentStock: ['현재재고', '현제재고', '현재 재고', '현제 재고', '전체재고', '전체 재고'],
   totalQuantity: ['총수량', '총 수량'],
 }
 
@@ -203,15 +204,6 @@ function inferItem(values) {
   ))?.key || ''
 }
 
-function fillRow(row = [], maxColumns = row.length) {
-  let previous = ''
-  return Array.from({ length: maxColumns }, (_, index) => {
-    const value = String(row[index] || '').trim()
-    if (value) previous = value
-    return previous
-  })
-}
-
 function findDateRowIndex(rows, targetDate) {
   const targetYear = targetDate.slice(0, 4)
   return rows.findIndex((row) => normalizeDate(row[0], targetYear) === targetDate)
@@ -219,23 +211,29 @@ function findDateRowIndex(rows, targetDate) {
 
 function findColumns(rows, sheetTitle) {
   const maxColumns = Math.max(...rows.map((row) => row.length), 0)
-  const categoryRow = fillRow(rows[0] || [], maxColumns)
+  const categoryRow = rows[0] || []
   const metricRow = rows[1] || []
   const columns = {}
+  let currentItemKey = ''
+  let currentItemStartColumn = -1
 
   for (let columnIndex = 0; columnIndex < maxColumns; columnIndex += 1) {
+    const categoryItemKey = inferItem([
+      categoryRow[columnIndex] || '',
+      sheetTitle,
+    ])
+    if (categoryItemKey) {
+      currentItemKey = categoryItemKey
+      currentItemStartColumn = columnIndex
+    }
+
     const metric = inferMetric(metricRow[columnIndex] || '')
     if (!metric) continue
 
-    const itemKey = inferItem([
-      categoryRow[columnIndex] || '',
-      rows[0]?.[columnIndex] || '',
-      sheetTitle,
-    ])
-    if (!itemKey) continue
+    if (!currentItemKey || columnIndex - currentItemStartColumn >= METRIC_COLUMNS_PER_ITEM) continue
 
-    columns[itemKey] ||= {}
-    columns[itemKey][metric] = columnIndex
+    columns[currentItemKey] ||= {}
+    columns[currentItemKey][metric] = columnIndex
   }
 
   return columns
