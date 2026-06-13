@@ -429,16 +429,10 @@ async function saveLinenInventory(env, { requiredQuantities = {}, receivedInputs
 
   linenItems.forEach((item) => {
     const itemColumns = layout.columns[item.key] || {}
-    const row = layout.rows[layout.dateRowIndex] || []
-    const currentColumn = itemColumns.currentQuantity
     const requiredColumn = itemColumns.requiredQuantity
     const incomingColumn = itemColumns.incomingQuantity
-    const stockColumn = itemColumns.currentStock
-    const totalColumn = itemColumns.totalQuantity
     const requiredQuantity = toNonNegativeNumber(requiredQuantities[item.key])
     const incomingQuantity = incomingQuantities[item.key]
-    const currentQuantity = currentColumn === undefined ? 0 : toNumber(row[currentColumn])
-    const currentStock = Math.max(0, currentQuantity + requiredQuantity + incomingQuantity)
 
     if (requiredColumn !== undefined) {
       data.push({
@@ -453,23 +447,9 @@ async function saveLinenInventory(env, { requiredQuantities = {}, receivedInputs
         values: [[incomingQuantity]],
       })
     }
-
-    if (stockColumn !== undefined) {
-      data.push({
-        range: `${quoteSheetName(layout.sheetTitle)}!${columnToA1(stockColumn)}${layout.dateRowIndex + 1}`,
-        values: [[currentStock]],
-      })
-    }
-
-    if (totalColumn !== undefined) {
-      data.push({
-        range: `${quoteSheetName(layout.sheetTitle)}!${columnToA1(totalColumn)}${layout.dateRowIndex + 1}`,
-        values: [[currentStock + item.fixedQuantity]],
-      })
-    }
   })
 
-  if (!data.length) throw new Error('저장할 세탁필요수량, 들어온수량, 현재재고 또는 총수량 컬럼을 찾지 못했습니다.')
+  if (!data.length) throw new Error('저장할 세탁필요수량 또는 들어온수량 컬럼을 찾지 못했습니다.')
 
   await fetchSheets(`${spreadsheetId}/values:batchUpdate`, {}, env, {
     method: 'POST',
