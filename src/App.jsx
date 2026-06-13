@@ -485,6 +485,8 @@ function App() {
     const byFloor = {}
     const unmatchedRoomTypes = new Set()
 
+    const extraFootTowelCount = Number(assignment?.extraFootTowelCount) || 0
+
     assignment?.rooms?.forEach((room) => {
       const roomType = normalizeRoomType(room.roomType)
       const rule = roomTypeSupplyRules[roomType]
@@ -521,6 +523,8 @@ function App() {
         byFloor[floor].totals[column.key] += rule[column.key]
       })
     })
+
+    totals.bathMat += extraFootTowelCount
 
     return {
       totals,

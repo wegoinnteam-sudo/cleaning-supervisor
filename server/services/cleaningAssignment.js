@@ -1,6 +1,10 @@
 import { google } from 'googleapis'
 
 const DEFAULT_SPREADSHEET_ID = '1ALRPlfA777W1KHiHycva9RuGrPAaSwLg1mJLWS5bJcU'
+const AMENITY_REQUEST_SPREADSHEET_ID = '1pRIz51Is_OmixDc0MVfCXcWQ0_Zeg-oVfSejsfx8aIk'
+const AMENITY_REQUEST_SHEET_NAME = '(편집X)Amenity Request'
+const AMENITY_REQUEST_RANGE = 'A:E'
+const EXTRA_FOOT_TOWEL_ITEM = 'Extra foot towel'
 const DEFAULT_SHEET_GID = '160745438'
 const DATA_RANGE = 'A2:ZZ46'
 const KOREA_TIME_ZONE = 'Asia/Seoul'
@@ -22,6 +26,53 @@ function getTodayInKorea(date = new Date()) {
 
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
   return `${values.year}.${values.month}.${values.day}`
+}
+
+function getKoreaDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: KOREA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day),
+  }
+}
+
+function kstDateToUtcDate(year, month, day, hour, minute, second) {
+  return new Date(Date.UTC(year, month - 1, day, hour - 9, minute, second))
+}
+
+function getAmenityRequestWindow(date = new Date()) {
+  const { year, month, day } = getKoreaDateParts(date)
+  const end = kstDateToUtcDate(year, month, day, 13, 5, 59)
+  const start = new Date(kstDateToUtcDate(year, month, day, 13, 6, 0).getTime() - 24 * 60 * 60 * 1000)
+
+  return { start, end }
+}
+
+function parseKoreanDateTime(value = '') {
+  const match = String(value).trim().match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\s*(오전|오후)\s*(\d{1,2}):(\d{2}):(\d{2})$/)
+  if (!match) return null
+
+  const [, year, month, day, meridiem, rawHour, minute, second] = match
+  let hour = Number(rawHour)
+  if (meridiem === '오전' && hour === 12) hour = 0
+  if (meridiem === '오후' && hour < 12) hour += 12
+
+  return kstDateToUtcDate(
+    Number(year),
+    Number(month),
+    Number(day),
+    hour,
+    Number(minute),
+    Number(second),
+  )
 }
 
 function normalizeDate(value = '', defaultYear = new Date().getFullYear()) {
@@ -158,6 +209,29 @@ function getSheetGid() {
   return process.env.GOOGLE_SHEET_GID || DEFAULT_SHEET_GID
 }
 
+async function countExtraFootTowels(sheets, now = new Date()) {
+  try {
+    const { start, end } = getAmenityRequestWindow(now)
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: AMENITY_REQUEST_SPREADSHEET_ID,
+      key: process.env.GOOGLE_API_KEY,
+      range: `${quoteSheetName(AMENITY_REQUEST_SHEET_NAME)}!${AMENITY_REQUEST_RANGE}`,
+      valueRenderOption: 'FORMATTED_VALUE',
+    })
+
+    return (response.data.values || []).filter((row) => {
+      const requestedAt = parseKoreanDateTime(row[0])
+      return requestedAt
+        && requestedAt >= start
+        && requestedAt <= end
+        && String(row[4] || '').trim() === EXTRA_FOOT_TOWEL_ITEM
+    }).length
+  } catch (error) {
+    console.warn('[amenity-request] extra foot towel count failed:', error.message)
+    return 0
+  }
+}
+
 async function getTargetSheetTitle(sheets, spreadsheetId) {
   const response = await sheets.spreadsheets.get({
     spreadsheetId,
@@ -241,6 +315,7 @@ export async function buildCleaningAssignment() {
     rooms,
     countsByType: countByRoomType(rooms),
     total: rooms.length,
+    extraFootTowelCount: await countExtraFootTowels(sheets),
     byStaff,
   }
 }
