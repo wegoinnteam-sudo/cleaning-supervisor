@@ -18,6 +18,9 @@ const linenItems = [
   { key: 'bathMat', labels: ['발매트', 'bath mat'], packSize: 20, fixedQuantity: 43 },
 ]
 
+const writableMetricKeys = new Set(['requiredQuantity', 'incomingQuantity'])
+const readOnlyMetricKeys = new Set(['currentStock', 'totalQuantity'])
+
 const metricAliases = {
   currentQuantity: ['현재수량', '현제수량', '아침수량', '아침 수량'],
   requiredQuantity: ['세탁필요수량', '세탁 필요 수량', '더티수량', '더티 수량'],
@@ -259,6 +262,10 @@ function getConfiguredSheetTitle(env) {
   return env.GOOGLE_LINEN_SHEET_NAME || env.GOOGLE_INVENTORY_SHEET_NAME || ''
 }
 
+function isWritableLinenMetric(metric) {
+  return writableMetricKeys.has(metric) && !readOnlyMetricKeys.has(metric)
+}
+
 function inferMetric(value = '') {
   const normalizedValue = normalizeLabel(value)
   return Object.entries(metricAliases).find(([, aliases]) => (
@@ -420,6 +427,50 @@ async function getLinenInventory(env) {
   }
 }
 
+export async function saveRequiredLinenQuantities(env, requiredQuantities = {}) {
+  const spreadsheetId = getSpreadsheetId(env)
+  const date = getTodayInKorea()
+  const layout = await findInventoryLayout(spreadsheetId, date, env)
+  const data = []
+
+  linenItems.forEach((item) => {
+    const itemColumns = layout.columns[item.key] || {}
+    const blockedColumns = new Set([itemColumns.currentStock, itemColumns.totalQuantity])
+    const requiredColumn = isWritableLinenMetric('requiredQuantity') && !blockedColumns.has(itemColumns.requiredQuantity)
+      ? itemColumns.requiredQuantity
+      : undefined
+    const requiredQuantity = toNonNegativeNumber(requiredQuantities[item.key])
+
+    if (requiredColumn !== undefined) {
+      data.push({
+        range: `${quoteSheetName(layout.sheetTitle)}!${columnToA1(requiredColumn)}${layout.dateRowIndex + 1}`,
+        values: [[requiredQuantity]],
+      })
+    }
+  })
+
+  if (!data.length) throw new Error('저장할 세탁필요수량 컬럼을 찾지 못했습니다.')
+
+  await fetchSheets(`${spreadsheetId}/values:batchUpdate`, {}, env, {
+    method: 'POST',
+    scope: WRITE_SCOPE,
+    requireAuth: true,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data }),
+  })
+
+  const refreshedLayout = await findInventoryLayout(spreadsheetId, date, env)
+
+  return {
+    spreadsheetId,
+    sheetTitle: layout.sheetTitle,
+    date,
+    requiredQuantities,
+    updatedRanges: data.map((entry) => entry.range),
+    inventory: readInventoryValues(refreshedLayout),
+  }
+}
+
 async function saveLinenInventory(env, { requiredQuantities = {}, receivedInputs = {} }) {
   const spreadsheetId = getSpreadsheetId(env)
   const date = getTodayInKorea()
@@ -429,8 +480,13 @@ async function saveLinenInventory(env, { requiredQuantities = {}, receivedInputs
 
   linenItems.forEach((item) => {
     const itemColumns = layout.columns[item.key] || {}
-    const requiredColumn = itemColumns.requiredQuantity
-    const incomingColumn = itemColumns.incomingQuantity
+    const blockedColumns = new Set([itemColumns.currentStock, itemColumns.totalQuantity])
+    const requiredColumn = isWritableLinenMetric('requiredQuantity') && !blockedColumns.has(itemColumns.requiredQuantity)
+      ? itemColumns.requiredQuantity
+      : undefined
+    const incomingColumn = isWritableLinenMetric('incomingQuantity') && !blockedColumns.has(itemColumns.incomingQuantity)
+      ? itemColumns.incomingQuantity
+      : undefined
     const requiredQuantity = toNonNegativeNumber(requiredQuantities[item.key])
     const incomingQuantity = incomingQuantities[item.key]
 

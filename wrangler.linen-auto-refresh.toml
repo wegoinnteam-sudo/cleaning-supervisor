@@ -1,0 +1,6 @@
+name = "cleaning-supervisor-linen-auto-refresh"
+main = "workers/linen-auto-refresh.js"
+compatibility_date = "2026-06-24"
+
+[triggers]
+crons = ["7 4 * * *"]

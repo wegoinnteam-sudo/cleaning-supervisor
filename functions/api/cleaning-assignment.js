@@ -326,7 +326,7 @@ async function getTargetSheetTitle(spreadsheetId, env) {
   return sheetProperties[0]?.title
 }
 
-async function buildCleaningAssignment(env) {
+export async function buildCleaningAssignment(env) {
   const spreadsheetId = getSpreadsheetId(env)
   const today = getTodayInKorea()
   const todayYear = today.slice(0, 4)

@@ -99,6 +99,18 @@ KV namespace: cleaning-supervisor-room-checks
 
 체크 상태는 날짜별 key로 저장되므로 새 한국시간 날짜가 되면 자동으로 빈 체크 상태로 시작합니다.
 
+## 린넨 자동 갱신
+
+매일 한국시간 13:07에 Amenity Request의 `Extra foot towel`을 다시 계산해 린넨 시트의 `세탁필요수량`만 덮어쓸 수 있습니다. `들어온수량`은 자동 갱신에서 수정하지 않습니다.
+
+Cloudflare Pages 환경변수와 Cron Worker 환경변수에 같은 값을 설정합니다.
+
+```text
+AUTO_REFRESH_SECRET=충분히_긴_랜덤_문자열
+```
+
+Cron Worker는 `wrangler.linen-auto-refresh.toml` 설정을 사용합니다. 스케줄 `7 4 * * *`는 UTC 기준이며 한국시간 13:07입니다.
+
 ## API
 
 ```text
