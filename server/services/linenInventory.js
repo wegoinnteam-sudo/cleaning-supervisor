@@ -44,6 +44,9 @@ const linenItems = [
   },
 ]
 
+const writableMetricKeys = new Set(['requiredQuantity', 'incomingQuantity'])
+const readOnlyMetricKeys = new Set(['currentStock', 'totalQuantity'])
+
 const metricAliases = {
   currentQuantity: ['현재수량', '현제수량', '아침수량', '아침 수량'],
   requiredQuantity: ['세탁필요수량', '세탁 필요 수량', '더티수량', '더티 수량'],
@@ -192,6 +195,10 @@ function columnToA1(index) {
 
 function getConfiguredSheetTitle() {
   return process.env.GOOGLE_LINEN_SHEET_NAME || process.env.GOOGLE_INVENTORY_SHEET_NAME || ''
+}
+
+function isWritableLinenMetric(metric) {
+  return writableMetricKeys.has(metric) && !readOnlyMetricKeys.has(metric)
 }
 
 function inferMetric(value = '') {
@@ -346,8 +353,13 @@ export async function saveLinenInventory({ requiredQuantities = {}, receivedInpu
 
   linenItems.forEach((item) => {
     const itemColumns = layout.columns[item.key] || {}
-    const requiredColumn = itemColumns.requiredQuantity
-    const incomingColumn = itemColumns.incomingQuantity
+    const blockedColumns = new Set([itemColumns.currentStock, itemColumns.totalQuantity])
+    const requiredColumn = isWritableLinenMetric('requiredQuantity') && !blockedColumns.has(itemColumns.requiredQuantity)
+      ? itemColumns.requiredQuantity
+      : undefined
+    const incomingColumn = isWritableLinenMetric('incomingQuantity') && !blockedColumns.has(itemColumns.incomingQuantity)
+      ? itemColumns.incomingQuantity
+      : undefined
     const requiredQuantity = toNonNegativeNumber(requiredQuantities[item.key])
     const incomingQuantity = incomingQuantities[item.key]
 
