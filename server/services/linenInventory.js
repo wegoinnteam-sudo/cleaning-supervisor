@@ -217,7 +217,7 @@ function inferItem(values) {
 
 function findDateRowIndex(rows, targetDate) {
   const targetYear = targetDate.slice(0, 4)
-  return rows.findIndex((row) => normalizeDate(row[0], targetYear) === targetDate)
+  return rows.findIndex((row) => normalizeDate(row[1], targetYear) === targetDate)
 }
 
 function findColumns(rows, sheetTitle) {
@@ -341,12 +341,16 @@ export async function getLinenInventory() {
   }
 }
 
-export async function saveLinenInventory({ requiredQuantities = {}, receivedInputs = {} }) {
+export async function saveLinenInventory({
+  date: requestedDate = '',
+  requiredQuantities = {},
+  receivedInputs = {},
+}) {
   ensureWritableAuth()
 
   const sheets = getSheetsClient(['https://www.googleapis.com/auth/spreadsheets'])
   const spreadsheetId = getSpreadsheetId()
-  const date = getTodayInKorea()
+  const date = normalizeDate(requestedDate) || getTodayInKorea()
   const layout = await findInventoryLayout(sheets, spreadsheetId, date)
   const incomingQuantities = buildIncomingQuantities(receivedInputs)
   const data = []

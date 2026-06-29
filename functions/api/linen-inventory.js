@@ -282,7 +282,7 @@ function inferItem(values) {
 
 function findDateRowIndex(rows, targetDate) {
   const targetYear = targetDate.slice(0, 4)
-  return rows.findIndex((row) => normalizeDate(row[0], targetYear) === targetDate)
+  return rows.findIndex((row) => normalizeDate(row[1], targetYear) === targetDate)
 }
 
 function findColumns(rows, sheetTitle) {
@@ -471,9 +471,9 @@ export async function saveRequiredLinenQuantities(env, requiredQuantities = {}) 
   }
 }
 
-async function saveLinenInventory(env, { requiredQuantities = {}, receivedInputs = {} }) {
+async function saveLinenInventory(env, { date: requestedDate = '', requiredQuantities = {}, receivedInputs = {} }) {
   const spreadsheetId = getSpreadsheetId(env)
-  const date = getTodayInKorea()
+  const date = normalizeDate(requestedDate) || getTodayInKorea()
   const layout = await findInventoryLayout(spreadsheetId, date, env)
   const incomingQuantities = buildIncomingQuantities(receivedInputs)
   const data = []

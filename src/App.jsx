@@ -560,6 +560,7 @@ function App() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
+          date: assignment.date,
           requiredQuantities,
           receivedInputs: linenInputs,
         }),
