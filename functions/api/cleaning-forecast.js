@@ -12,9 +12,14 @@ const CHECKOUT_COLUMN_INDEX = 6 // G
 const NO_SHOW_COLUMN_INDEX = 4 // E
 const ADJUSTMENT_COLUMN_INDEX = 5 // F
 const ACTUAL_CLEAN_COLUMN_INDEX = 6 // G
-const STAFF_START_COLUMN_INDEX = 11 // L
-const STAFF_END_COLUMN_INDEX = 24 // Y
 const NOTE_COLUMN_INDEX = 25 // Z
+
+const STAFF_GROUP_DEFINITIONS = [
+  { position: 'Exchange Staff', startColumn: 11, endColumn: 17 }, // L-R
+  { position: 'Part-Time', startColumn: 18, endColumn: 22 }, // S-W
+  { position: 'SV', startColumn: 23, endColumn: 23 }, // X
+  { position: 'SUB', startColumn: 24, endColumn: 24 }, // Y
+]
 
 let cachedAccessToken = null
 
@@ -208,26 +213,14 @@ function splitStaffNames(value = '') {
   return value.split(/[\n,、/]+/).map((name) => name.trim()).filter(Boolean)
 }
 
-function buildStaffGroups(row, headerRow) {
-  const groups = []
-
-  for (let column = STAFF_START_COLUMN_INDEX; column <= STAFF_END_COLUMN_INDEX; column += 1) {
-    const position = cell(headerRow, column)
-    const rawValue = cell(row, column)
-    if (!position || !rawValue) continue
-
-    const staffNames = splitStaffNames(rawValue)
-    if (!staffNames.length) continue
-
-    let group = groups.find((candidate) => candidate.position === position)
-    if (!group) {
-      group = { position, staffNames: [] }
-      groups.push(group)
+function buildStaffGroups(row) {
+  return STAFF_GROUP_DEFINITIONS.map(({ position, startColumn, endColumn }) => {
+    const staffNames = []
+    for (let column = startColumn; column <= endColumn; column += 1) {
+      staffNames.push(...splitStaffNames(cell(row, column)))
     }
-    group.staffNames.push(...staffNames)
-  }
-
-  return groups
+    return { position, staffNames }
+  }).filter((group) => group.staffNames.length > 0)
 }
 
 function quoteSheetName(title) {
@@ -304,7 +297,7 @@ async function getScheduleSheetTitle(spreadsheetId, env) {
   return matchingTitle
 }
 
-function buildDayEntry(date, row, headerRow) {
+function buildDayEntry(date, row) {
   if (!row) {
     return {
       date,
@@ -333,7 +326,7 @@ function buildDayEntry(date, row, headerRow) {
     noShowAdjustment,
     miscAdjustment,
     actualCleaningRooms,
-    staffByPosition: buildStaffGroups(row, headerRow),
+    staffByPosition: buildStaffGroups(row),
     note: cell(row, NOTE_COLUMN_INDEX),
   }
 }
@@ -351,7 +344,6 @@ export async function buildCleaningForecast(env) {
   }, env)
 
   const rows = data.values || []
-  const headerRow = rows[0] || []
   const rowsByDate = new Map()
 
   rows.slice(1).forEach((row) => {
@@ -361,7 +353,7 @@ export async function buildCleaningForecast(env) {
     }
   })
 
-  const days = getUpcomingKoreaDates().map((date) => buildDayEntry(date, rowsByDate.get(date), headerRow))
+  const days = getUpcomingKoreaDates().map((date) => buildDayEntry(date, rowsByDate.get(date)))
 
   return {
     spreadsheetId,
