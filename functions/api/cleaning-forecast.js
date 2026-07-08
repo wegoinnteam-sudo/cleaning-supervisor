@@ -8,7 +8,7 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly'
 
 const DATE_COLUMN_INDEX = 1 // B
-const CHECKOUT_COLUMN_INDEX = 3 // D
+const CHECKOUT_COLUMN_INDEX = 6 // G
 const NO_SHOW_COLUMN_INDEX = 4 // E
 const ADJUSTMENT_COLUMN_INDEX = 5 // F
 const ACTUAL_CLEAN_COLUMN_INDEX = 6 // G
@@ -176,7 +176,7 @@ function getUpcomingKoreaDates(date = new Date(), count = FORECAST_DAY_COUNT) {
 
 function normalizeDate(value = '', defaultYear = getKoreaDateParts().year) {
   const dateText = String(value)
-  const fullDateMatch = dateText.match(/(\d{4})\D?(\d{1,2})\D?(\d{1,2})/)
+  const fullDateMatch = dateText.match(/(\d{4})\D*(\d{1,2})\D*(\d{1,2})/)
 
   if (fullDateMatch) {
     const [, year, month, day] = fullDateMatch
