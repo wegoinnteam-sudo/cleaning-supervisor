@@ -1,6 +1,6 @@
 const DEFAULT_SPREADSHEET_ID = '1ALRPlfA777W1KHiHycva9RuGrPAaSwLg1mJLWS5bJcU'
-const DEFAULT_SCHEDULE_SHEET_NAME = '청소스케줄'
-const SCHEDULE_SHEET_NAME_ALIASES = ['청소스케쥴']
+const DEFAULT_SCHEDULE_SHEET_NAME = '청소스케쥴'
+const SCHEDULE_SHEET_NAME_ALIASES = ['청소스케줄']
 const SCHEDULE_RANGE = 'A1:Z3000'
 const KOREA_TIME_ZONE = 'Asia/Seoul'
 const FORECAST_DAY_COUNT = 7
@@ -268,7 +268,6 @@ async function fetchSheets(path, params, env) {
 
 async function getScheduleSheetTitle(spreadsheetId, env) {
   const configuredTitle = env.GOOGLE_SCHEDULE_SHEET_NAME
-  if (configuredTitle) return configuredTitle
 
   const data = await fetchSheets(spreadsheetId, {
     fields: 'sheets(properties(title,index))',
@@ -285,8 +284,13 @@ async function getScheduleSheetTitle(spreadsheetId, env) {
     ...SCHEDULE_SHEET_NAME_ALIASES,
   ].map(normalizeScheduleSheetTitle)
 
-  const matchingTitle = titles.find((title) => normalizedTargetTitles.includes(normalizeScheduleSheetTitle(title)))
+  const normalizedConfiguredTitle = normalizeScheduleSheetTitle(configuredTitle)
+  const matchingConfiguredTitle = configuredTitle
+    ? titles.find((title) => normalizeScheduleSheetTitle(title) === normalizedConfiguredTitle)
+    : ''
+  const matchingKnownTitle = titles.find((title) => normalizedTargetTitles.includes(normalizeScheduleSheetTitle(title)))
     || titles.find((title) => normalizedTargetTitles.some((targetTitle) => normalizeScheduleSheetTitle(title).includes(targetTitle)))
+  const matchingTitle = matchingConfiguredTitle || matchingKnownTitle
 
   if (!matchingTitle) {
     const availableTitles = titles.length ? titles.join(', ') : '없음'
