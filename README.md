@@ -12,6 +12,7 @@ Google Spreadsheet를 읽어서 오늘 청소해야 하는 객실 목록과 직�
 - C열 ROOM TYPE, E열 ROOM NUMBER, 오늘 날짜 셀의 직원 이름을 읽습니다.
 - ROOM TYPE별 개수, 총 객실 수, 직원별 배정 목록을 생성합니다.
 - 매일 00:00 한국시간에 서버 캐시를 자동 갱신합니다.
+- `청소스케줄` 시트를 읽어 내일부터 7일간의 예상 객실 청소배정(CHECK OUT 객실 수, 실제 청소 객실 수, 포지션별 근무 직원, NOTE)을 보여주며, 매 요청마다 최신 값을 다시 읽어옵니다.
 
 ## 설정
 
@@ -116,6 +117,7 @@ Cron Worker는 `wrangler.linen-auto-refresh.toml` 설정을 사용합니다. 스
 ```text
 GET /api/cleaning-assignment
 GET /api/cleaning-assignment?refresh=true
+GET /api/cleaning-forecast
 GET /api/room-checks?date=2026.05.18
 POST /api/room-checks
 ```

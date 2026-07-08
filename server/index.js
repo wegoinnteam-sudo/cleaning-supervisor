@@ -3,6 +3,7 @@ import cron from 'node-cron'
 import dotenv from 'dotenv'
 import express from 'express'
 import { buildCleaningAssignment } from './services/cleaningAssignment.js'
+import { buildCleaningForecast } from './services/cleaningForecast.js'
 import { getLinenInventory, saveLinenInventory } from './services/linenInventory.js'
 
 dotenv.config()
@@ -47,6 +48,16 @@ app.get('/api/cleaning-assignment', async (request, response) => {
     response.status(500).json({
       message: error.message,
       lastError: lastError?.message || null,
+    })
+  }
+})
+
+app.get('/api/cleaning-forecast', async (request, response) => {
+  try {
+    response.json(await buildCleaningForecast())
+  } catch (error) {
+    response.status(500).json({
+      message: error.message,
     })
   }
 })

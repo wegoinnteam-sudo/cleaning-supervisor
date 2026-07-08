@@ -13,8 +13,24 @@ const translations = {
     roomsTab: '객실 청소배정',
     itemsTab: '필요 품목 갯수',
     linenTab: '린넨 재고파악',
+    forecastTab: '예상 객실 청소배정',
     loadErrorTitle: '데이터를 읽을 수 없습니다.',
     loadErrorFallback: '청소 배정 정보를 불러오지 못했습니다.',
+    forecastLoadErrorTitle: '예상 청소배정 정보를 읽을 수 없습니다.',
+    forecastLoadErrorFallback: '예상 청소배정 정보를 불러오지 못했습니다.',
+    forecastRange: '예상 기간',
+    forecastDateLabel: '날짜',
+    forecastCheckOut: 'CHECK OUT',
+    forecastActualClean: '실제 청소',
+    forecastStaff: '근무자',
+    forecastNoStaff: '근무자 정보가 없습니다.',
+    forecastNote: 'NOTE',
+    forecastNoNote: '특이사항 없음',
+    forecastNoDayData: '시트에서 해당 날짜 데이터를 찾지 못했습니다.',
+    forecastSvOn: 'SV 근무',
+    forecastSvOff: 'SV 없음',
+    forecastBusyBadge: '혼잡 예상',
+    forecastRoomsValue: (count) => `${count}개 객실`,
     checkSyncErrorTitle: '체크 상태를 저장할 수 없습니다.',
     checkSyncErrorFallback: '공유 체크 상태를 저장하지 못했습니다.',
     linenSyncErrorTitle: '린넨 재고를 저장할 수 없습니다.',
@@ -71,8 +87,24 @@ const translations = {
     roomsTab: 'Room Cleaning Assignment',
     itemsTab: 'Required Item Count',
     linenTab: 'Linen Inventory',
+    forecastTab: 'Upcoming Cleaning Forecast',
     loadErrorTitle: 'Unable to read data.',
     loadErrorFallback: 'Unable to load cleaning assignment data.',
+    forecastLoadErrorTitle: 'Unable to read the upcoming cleaning forecast.',
+    forecastLoadErrorFallback: 'Unable to load the upcoming cleaning forecast.',
+    forecastRange: 'Forecast Range',
+    forecastDateLabel: 'Date',
+    forecastCheckOut: 'CHECK OUT',
+    forecastActualClean: 'Actual Cleaning',
+    forecastStaff: 'Staff',
+    forecastNoStaff: 'No staff assigned.',
+    forecastNote: 'NOTE',
+    forecastNoNote: 'No special notes',
+    forecastNoDayData: 'No data found in the sheet for this date.',
+    forecastSvOn: 'SV On Duty',
+    forecastSvOff: 'No SV',
+    forecastBusyBadge: 'Busy',
+    forecastRoomsValue: (count) => `${count} Rooms`,
     checkSyncErrorTitle: 'Unable to save check status.',
     checkSyncErrorFallback: 'Unable to save shared check status.',
     linenSyncErrorTitle: 'Unable to save linen inventory.',
@@ -272,6 +304,8 @@ function App() {
   const [checkError, setCheckError] = useState('')
   const [linenError, setLinenError] = useState('')
   const [linenInventory, setLinenInventory] = useState(null)
+  const [forecast, setForecast] = useState(null)
+  const [forecastError, setForecastError] = useState('')
   const [linenInputs, setLinenInputs] = useState(createLinenInputs)
   const [linenSaving, setLinenSaving] = useState(false)
   const [linenSavedAt, setLinenSavedAt] = useState('')
@@ -336,6 +370,17 @@ function App() {
     return data
   }, [t.linenSyncErrorFallback])
 
+  const fetchForecast = useCallback(async () => {
+    const response = await fetch('/api/cleaning-forecast', { cache: 'no-store' })
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.message || t.forecastLoadErrorFallback)
+    }
+
+    return data
+  }, [t.forecastLoadErrorFallback])
+
   async function refreshAssignment() {
     setLoading(true)
     setError('')
@@ -347,6 +392,24 @@ function App() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function refreshActive() {
+    if (activeCategory === 'forecast') {
+      setLoading(true)
+      setForecastError('')
+
+      try {
+        setForecast(await fetchForecast())
+      } catch (loadError) {
+        setForecastError(loadError.message)
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    await refreshAssignment()
   }
 
   useEffect(() => {
@@ -405,6 +468,45 @@ function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [activeCategory, fetchAssignment])
+
+  useEffect(() => {
+    if (activeCategory !== 'forecast') return undefined
+
+    let ignore = false
+    let refreshInProgress = false
+
+    async function syncForecast() {
+      if (document.visibilityState === 'hidden' || refreshInProgress) return
+
+      refreshInProgress = true
+
+      try {
+        const data = await fetchForecast()
+        if (!ignore) {
+          setForecast(data)
+          setForecastError('')
+        }
+      } catch (loadError) {
+        if (!ignore) setForecastError(loadError.message)
+      } finally {
+        refreshInProgress = false
+      }
+    }
+
+    syncForecast()
+    const intervalId = window.setInterval(syncForecast, ASSIGNMENT_REFRESH_INTERVAL_MS)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') syncForecast()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      ignore = true
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [activeCategory, fetchForecast])
 
   useEffect(() => {
     if (!assignment?.date) return
@@ -471,6 +573,29 @@ function App() {
     if (!assignment?.rooms) return []
     return assignment.rooms.filter((room) => checkedRooms.has(getRoomKey(room)))
   }, [assignment, checkedRooms])
+
+  const forecastDays = useMemo(() => {
+    const days = forecast?.days || []
+    const knownRoomCounts = days.filter((day) => day.hasData).map((day) => day.actualCleaningRooms)
+    const minRooms = knownRoomCounts.length ? Math.min(...knownRoomCounts) : 0
+    const maxRooms = knownRoomCounts.length ? Math.max(...knownRoomCounts) : 0
+    const roomRange = maxRooms - minRooms
+
+    return days.map((day) => {
+      let tier = 'normal'
+      if (day.hasData && roomRange > 0) {
+        const ratio = (day.actualCleaningRooms - minRooms) / roomRange
+        if (ratio >= 0.66) tier = 'high'
+        else if (ratio >= 0.33) tier = 'medium'
+      }
+
+      const hasSupervisor = day.staffByPosition.some((group) => (
+        group.position.trim().toUpperCase() === 'SV' && group.staffNames.length > 0
+      ))
+
+      return { ...day, tier, hasSupervisor }
+    })
+  }, [forecast])
 
   const linenIncomingSummary = useMemo(() => Object.fromEntries(linenColumns.map((column) => {
     const inputValue = Number(linenInputs[column.key])
@@ -653,7 +778,7 @@ function App() {
               English
             </button>
           </div>
-          <button type="button" className="refresh-button" onClick={refreshAssignment}>
+          <button type="button" className="refresh-button" onClick={refreshActive}>
             {t.refresh}
           </button>
         </div>
@@ -681,6 +806,13 @@ function App() {
         >
           {t.linenTab}
         </button>
+        <button
+          type="button"
+          className={activeCategory === 'forecast' ? 'active' : ''}
+          onClick={() => setActiveCategory('forecast')}
+        >
+          {t.forecastTab}
+        </button>
       </nav>
 
       {error && (
@@ -701,6 +833,13 @@ function App() {
         <section className="notice" role="alert">
           <strong>{t.linenSyncErrorTitle}</strong>
           <span>{linenError}</span>
+        </section>
+      )}
+
+      {forecastError && (
+        <section className="notice" role="alert">
+          <strong>{t.forecastLoadErrorTitle}</strong>
+          <span>{forecastError}</span>
         </section>
       )}
 
@@ -999,6 +1138,84 @@ function App() {
             </section>
           )}
         </div>
+      )}
+
+      {activeCategory === 'forecast' && forecast && (
+        <>
+          <section className="summary-strip" aria-label="Summary">
+            <div>
+              <span>{t.sheet}</span>
+              <strong>{forecast.sheetTitle}</strong>
+            </div>
+            <div>
+              <span>{t.forecastRange}</span>
+              <strong>{forecastDays[0]?.date} ~ {forecastDays[forecastDays.length - 1]?.date}</strong>
+            </div>
+            <div>
+              <span>{t.lastUpdated}</span>
+              <strong>{formatter.format(new Date(forecast.generatedAt))}</strong>
+            </div>
+          </section>
+
+          <div className="forecast-grid">
+            {forecastDays.map((day) => (
+              <article
+                className={`forecast-card forecast-card--${day.tier}${day.hasData ? '' : ' forecast-card--empty'}`}
+                key={day.date}
+              >
+                <header className="forecast-card-header">
+                  <div className="forecast-date">
+                    <span>{t.forecastDateLabel}</span>
+                    <strong>{day.date}</strong>
+                  </div>
+                  <div className={`forecast-sv-badge ${day.hasSupervisor ? 'is-on' : 'is-off'}`}>
+                    {day.hasSupervisor ? t.forecastSvOn : t.forecastSvOff}
+                  </div>
+                </header>
+
+                <div className="forecast-metrics">
+                  <div className="forecast-metric">
+                    <span>{t.forecastCheckOut}</span>
+                    <strong>{t.forecastRoomsValue(day.checkOutRooms)}</strong>
+                  </div>
+                  <div className={`forecast-metric forecast-metric--actual${day.tier === 'high' ? ' is-busy' : ''}`}>
+                    <span>{t.forecastActualClean}</span>
+                    <strong>
+                      {t.forecastRoomsValue(day.actualCleaningRooms)}
+                      {day.tier === 'high' && <em className="forecast-busy-badge">{t.forecastBusyBadge}</em>}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="forecast-staff">
+                  <p className="forecast-section-label">{t.forecastStaff}</p>
+                  {day.staffByPosition.length > 0 ? (
+                    day.staffByPosition.map((group) => (
+                      <div
+                        className={`forecast-staff-group${group.position.trim().toUpperCase() === 'SV' ? ' forecast-staff-group--sv' : ''}`}
+                        key={group.position}
+                      >
+                        <h4>{group.position}</h4>
+                        <ul>
+                          {group.staffNames.map((name, index) => (
+                            <li key={`${group.position}-${name}-${index}`}>{name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="empty">{t.forecastNoStaff}</p>
+                  )}
+                </div>
+
+                <div className="forecast-note">
+                  <p className="forecast-section-label">{t.forecastNote}</p>
+                  <p>{day.hasData ? (day.note || t.forecastNoNote) : t.forecastNoDayData}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
       )}
     </main>
   )
