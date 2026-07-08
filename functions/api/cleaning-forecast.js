@@ -233,6 +233,10 @@ function quoteSheetName(title) {
   return `'${title.replaceAll("'", "''")}'`
 }
 
+function normalizeScheduleSheetTitle(title = '') {
+  return String(title).replace(/\s/g, '')
+}
+
 function getSpreadsheetId(env) {
   return env.GOOGLE_SPREADSHEET_ID || DEFAULT_SPREADSHEET_ID
 }
@@ -275,8 +279,10 @@ async function getScheduleSheetTitle(spreadsheetId, env) {
     .map((properties) => properties.title)
     .filter(Boolean) || []
 
-  return titles.find((title) => title.trim() === DEFAULT_SCHEDULE_SHEET_NAME)
-    || titles.find((title) => title.includes(DEFAULT_SCHEDULE_SHEET_NAME))
+  const normalizedDefaultTitle = normalizeScheduleSheetTitle(DEFAULT_SCHEDULE_SHEET_NAME)
+
+  return titles.find((title) => normalizeScheduleSheetTitle(title) === normalizedDefaultTitle)
+    || titles.find((title) => normalizeScheduleSheetTitle(title).includes(normalizedDefaultTitle))
 }
 
 function buildDayEntry(date, row, headerRow) {

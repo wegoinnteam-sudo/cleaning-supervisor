@@ -28,6 +28,7 @@ cp .env.example .env
 
 ```bash
 GOOGLE_SHEET_GID=160745438
+GOOGLE_SCHEDULE_SHEET_NAME=청소스케줄
 GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@project.iam.gserviceaccount.com
 GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
@@ -67,6 +68,7 @@ Cloudflare Pages 환경변수에는 아래 중 하나를 설정합니다.
 ```text
 GOOGLE_SPREADSHEET_ID=1ALRPlfA777W1KHiHycva9RuGrPAaSwLg1mJLWS5bJcU
 GOOGLE_SHEET_GID=160745438
+GOOGLE_SCHEDULE_SHEET_NAME=청소스케줄
 GOOGLE_API_KEY=...
 ```
 
