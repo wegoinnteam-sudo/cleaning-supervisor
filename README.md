@@ -12,7 +12,7 @@ Google Spreadsheet를 읽어서 오늘 청소해야 하는 객실 목록과 직�
 - C열 ROOM TYPE, E열 ROOM NUMBER, 오늘 날짜 셀의 직원 이름을 읽습니다.
 - ROOM TYPE별 개수, 총 객실 수, 직원별 배정 목록을 생성합니다.
 - 매일 00:00 한국시간에 서버 캐시를 자동 갱신합니다.
-- `청소스케줄` 시트를 읽어 내일부터 7일간의 예상 객실 청소배정(CHECK OUT 객실 수, 실제 청소 객실 수, 포지션별 근무 직원, NOTE)을 보여주며, 매 요청마다 최신 값을 다시 읽어옵니다.
+- `청소스케쥴` 시트를 읽어 내일부터 7일간의 예상 객실 청소배정(CHECK OUT 객실 수, 실제 청소 객실 수, 포지션별 근무 직원, NOTE)을 보여주며, 매 요청마다 최신 값을 다시 읽어옵니다.
 
 ## 설정
 
@@ -28,7 +28,7 @@ cp .env.example .env
 
 ```bash
 GOOGLE_SHEET_GID=160745438
-GOOGLE_SCHEDULE_SHEET_NAME=청소스케줄
+GOOGLE_SCHEDULE_SHEET_NAME=청소스케쥴
 GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@project.iam.gserviceaccount.com
 GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
@@ -68,7 +68,7 @@ Cloudflare Pages 환경변수에는 아래 중 하나를 설정합니다.
 ```text
 GOOGLE_SPREADSHEET_ID=1ALRPlfA777W1KHiHycva9RuGrPAaSwLg1mJLWS5bJcU
 GOOGLE_SHEET_GID=160745438
-GOOGLE_SCHEDULE_SHEET_NAME=청소스케줄
+GOOGLE_SCHEDULE_SHEET_NAME=청소스케쥴
 GOOGLE_API_KEY=...
 ```
 
