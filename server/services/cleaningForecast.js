@@ -205,8 +205,19 @@ async function getScheduleSheetTitle(sheets, spreadsheetId) {
 
   const normalizedDefaultTitle = normalizeScheduleSheetTitle(DEFAULT_SCHEDULE_SHEET_NAME)
 
-  return titles.find((title) => normalizeScheduleSheetTitle(title) === normalizedDefaultTitle)
+  const matchingTitle = titles.find((title) => normalizeScheduleSheetTitle(title) === normalizedDefaultTitle)
     || titles.find((title) => normalizeScheduleSheetTitle(title).includes(normalizedDefaultTitle))
+
+  if (!matchingTitle) {
+    const availableTitles = titles.length ? titles.join(', ') : '없음'
+    throw new Error(
+      `Google Spreadsheet에서 ${DEFAULT_SCHEDULE_SHEET_NAME} 시트를 찾지 못했습니다. `
+      + `발견된 시트: ${availableTitles}. `
+      + '탭명이 다르면 GOOGLE_SCHEDULE_SHEET_NAME 환경변수에 실제 탭명을 설정해 주세요.',
+    )
+  }
+
+  return matchingTitle
 }
 
 function buildDayEntry(date, row, headerRow) {
