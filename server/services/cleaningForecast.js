@@ -13,11 +13,11 @@ const NO_SHOW_COLUMN_INDEX = 4 // E
 const ADJUSTMENT_COLUMN_INDEX = 5 // F
 const ACTUAL_CLEAN_COLUMN_INDEX = 6 // G
 
-const STAFF_HEADER_DEFINITIONS = [
-  { position: 'Exchange Staff', header: 'exchangestaff', headerRows: [0, 1] },
-  { position: 'Part-Time', header: 'parttime', headerRows: [0, 1] },
-  { position: 'SV', header: 'sv', headerRows: [1] },
-  { position: 'SUB', header: 'sub', headerRows: [1] },
+const STAFF_GROUP_DEFINITIONS = [
+  { position: 'Exchange Staff', startColumn: 11, endColumn: 17 }, // L-R
+  { position: 'Part-Time', startColumn: 18, endColumn: 22 }, // S-W
+  { position: 'SV', startColumn: 23, endColumn: 23 }, // X
+  { position: 'SUB', startColumn: 24, endColumn: 24 }, // Y
 ]
 
 function getSpreadsheetId() {
@@ -112,11 +112,16 @@ function findHeaderColumns(rows, header, headerRows) {
 }
 
 function buildScheduleLayout(rows) {
+  const staffGroups = STAFF_GROUP_DEFINITIONS.map(({ position, startColumn, endColumn }) => ({
+    position,
+    columns: Array.from(
+      { length: endColumn - startColumn + 1 },
+      (_, offset) => startColumn + offset,
+    ),
+  }))
+
   return {
-    staffGroups: STAFF_HEADER_DEFINITIONS.map(({ position, header, headerRows }) => ({
-      position,
-      columns: findHeaderColumns(rows, header, headerRows),
-    })),
+    staffGroups,
     noteColumn: findHeaderColumns(rows, 'note', [0, 1])[0],
   }
 }
