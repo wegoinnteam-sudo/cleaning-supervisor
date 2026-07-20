@@ -8,17 +8,16 @@ const KOREA_TIME_ZONE = 'Asia/Seoul'
 const FORECAST_DAY_COUNT = 7
 
 const DATE_COLUMN_INDEX = 1 // B
-const CHECKOUT_COLUMN_INDEX = 6 // G
+const CHECKOUT_COLUMN_INDEX = 3 // D
 const NO_SHOW_COLUMN_INDEX = 4 // E
 const ADJUSTMENT_COLUMN_INDEX = 5 // F
 const ACTUAL_CLEAN_COLUMN_INDEX = 6 // G
-const NOTE_COLUMN_INDEX = 25 // Z
 
-const STAFF_GROUP_DEFINITIONS = [
-  { position: 'Exchange Staff', startColumn: 11, endColumn: 17 }, // L-R
-  { position: 'Part-Time', startColumn: 18, endColumn: 22 }, // S-W
-  { position: 'SV', startColumn: 23, endColumn: 23 }, // X
-  { position: 'SUB', startColumn: 24, endColumn: 24 }, // Y
+const STAFF_HEADER_DEFINITIONS = [
+  { position: 'Exchange Staff', header: 'exchangestaff', headerRows: [0, 1] },
+  { position: 'Part-Time', header: 'parttime', headerRows: [0, 1] },
+  { position: 'SV', header: 'sv', headerRows: [1] },
+  { position: 'SUB', header: 'sub', headerRows: [1] },
 ]
 
 function getSpreadsheetId() {
@@ -101,12 +100,30 @@ function splitStaffNames(value = '') {
   return value.split(/[\n,、/]+/).map((name) => name.trim()).filter(Boolean)
 }
 
-function buildStaffGroups(row) {
-  return STAFF_GROUP_DEFINITIONS.map(({ position, startColumn, endColumn }) => {
-    const staffNames = []
-    for (let column = startColumn; column <= endColumn; column += 1) {
-      staffNames.push(...splitStaffNames(cell(row, column)))
-    }
+function normalizeHeader(value = '') {
+  return String(value).toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function findHeaderColumns(rows, header, headerRows) {
+  const maxColumns = Math.max(...headerRows.map((rowIndex) => rows[rowIndex]?.length || 0), 0)
+  return Array.from({ length: maxColumns }, (_, columnIndex) => columnIndex).filter((columnIndex) => (
+    headerRows.some((rowIndex) => normalizeHeader(cell(rows[rowIndex], columnIndex)) === header)
+  ))
+}
+
+function buildScheduleLayout(rows) {
+  return {
+    staffGroups: STAFF_HEADER_DEFINITIONS.map(({ position, header, headerRows }) => ({
+      position,
+      columns: findHeaderColumns(rows, header, headerRows),
+    })),
+    noteColumn: findHeaderColumns(rows, 'note', [0, 1])[0],
+  }
+}
+
+function buildStaffGroups(row, layout) {
+  return layout.staffGroups.map(({ position, columns }) => {
+    const staffNames = columns.flatMap((column) => splitStaffNames(cell(row, column)))
     return { position, staffNames }
   }).filter((group) => group.staffNames.length > 0)
 }
@@ -221,7 +238,7 @@ async function getScheduleSheetTitle(sheets, spreadsheetId) {
   return matchingTitle
 }
 
-function buildDayEntry(date, row) {
+function buildDayEntry(date, row, layout) {
   if (!row) {
     return {
       date,
@@ -250,8 +267,8 @@ function buildDayEntry(date, row) {
     noShowAdjustment,
     miscAdjustment,
     actualCleaningRooms,
-    staffByPosition: buildStaffGroups(row),
-    note: cell(row, NOTE_COLUMN_INDEX),
+    staffByPosition: buildStaffGroups(row, layout),
+    note: cell(row, layout.noteColumn),
   }
 }
 
@@ -272,16 +289,17 @@ export async function buildCleaningForecast() {
   })
 
   const rows = response.data.values || []
+  const layout = buildScheduleLayout(rows)
   const rowsByDate = new Map()
 
-  rows.slice(1).forEach((row) => {
+  rows.slice(2).forEach((row) => {
     const normalizedDate = normalizeDate(cell(row, DATE_COLUMN_INDEX))
     if (normalizedDate && !rowsByDate.has(normalizedDate)) {
       rowsByDate.set(normalizedDate, row)
     }
   })
 
-  const days = getUpcomingKoreaDates().map((date) => buildDayEntry(date, rowsByDate.get(date)))
+  const days = getUpcomingKoreaDates().map((date) => buildDayEntry(date, rowsByDate.get(date), layout))
 
   return {
     spreadsheetId,

@@ -576,18 +576,9 @@ function App() {
 
   const forecastDays = useMemo(() => {
     const days = forecast?.days || []
-    const knownRoomCounts = days.filter((day) => day.hasData).map((day) => day.actualCleaningRooms)
-    const minRooms = knownRoomCounts.length ? Math.min(...knownRoomCounts) : 0
-    const maxRooms = knownRoomCounts.length ? Math.max(...knownRoomCounts) : 0
-    const roomRange = maxRooms - minRooms
 
     return days.map((day) => {
-      let tier = 'normal'
-      if (day.hasData && roomRange > 0) {
-        const ratio = (day.actualCleaningRooms - minRooms) / roomRange
-        if (ratio >= 0.66) tier = 'high'
-        else if (ratio >= 0.33) tier = 'medium'
-      }
+      const tier = day.hasData && day.actualCleaningRooms >= 17 ? 'high' : 'normal'
 
       const hasSupervisor = day.staffByPosition.some((group) => (
         group.position.trim().toUpperCase() === 'SV' && group.staffNames.length > 0
