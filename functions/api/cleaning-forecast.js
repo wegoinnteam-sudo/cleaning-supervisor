@@ -12,6 +12,7 @@ const CHECKOUT_COLUMN_INDEX = 3 // D
 const NO_SHOW_COLUMN_INDEX = 4 // E
 const ADJUSTMENT_COLUMN_INDEX = 5 // F
 const ACTUAL_CLEAN_COLUMN_INDEX = 6 // G
+const NOTE_COLUMN_INDEX = 26 // AA
 
 let cachedAccessToken = null
 
@@ -238,7 +239,7 @@ function buildScheduleLayout(rows, merges) {
 
   return {
     staffGroups,
-    noteColumn: findHeaderColumns(rows, 'note', [0, 1])[0],
+    noteColumn: NOTE_COLUMN_INDEX,
   }
 }
 
