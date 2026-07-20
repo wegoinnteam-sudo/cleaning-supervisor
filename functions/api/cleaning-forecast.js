@@ -13,13 +13,6 @@ const NO_SHOW_COLUMN_INDEX = 4 // E
 const ADJUSTMENT_COLUMN_INDEX = 5 // F
 const ACTUAL_CLEAN_COLUMN_INDEX = 6 // G
 
-const STAFF_GROUP_DEFINITIONS = [
-  { position: 'Exchange Staff', startColumn: 11, endColumn: 17 }, // L-R
-  { position: 'Part-Time', startColumn: 18, endColumn: 22 }, // S-W
-  { position: 'SV', startColumn: 23, endColumn: 23 }, // X
-  { position: 'SUB', startColumn: 24, endColumn: 24 }, // Y
-]
-
 let cachedAccessToken = null
 
 function json(data, status = 200) {
@@ -223,14 +216,25 @@ function findHeaderColumns(rows, header, headerRows) {
   ))
 }
 
-function buildScheduleLayout(rows) {
-  const staffGroups = STAFF_GROUP_DEFINITIONS.map(({ position, startColumn, endColumn }) => ({
-    position,
-    columns: Array.from(
-      { length: endColumn - startColumn + 1 },
-      (_, offset) => startColumn + offset,
-    ),
-  }))
+function findMergedHeaderColumns(rows, header, rowIndex, merges = []) {
+  return findHeaderColumns(rows, header, [rowIndex]).flatMap((columnIndex) => {
+    const mergedRange = merges.find((range) => (
+      range.startRowIndex <= rowIndex
+      && range.endRowIndex > rowIndex
+      && range.startColumnIndex === columnIndex
+    ))
+    const endColumn = mergedRange?.endColumnIndex ?? columnIndex + 1
+    return Array.from({ length: endColumn - columnIndex }, (_, offset) => columnIndex + offset)
+  })
+}
+
+function buildScheduleLayout(rows, merges) {
+  const staffGroups = [
+    { position: 'Exchange Staff', columns: findMergedHeaderColumns(rows, 'exchangestaff', 0, merges) },
+    { position: 'Part-Time', columns: findMergedHeaderColumns(rows, 'parttime', 0, merges) },
+    { position: 'SV', columns: findHeaderColumns(rows, 'sv', [1]) },
+    { position: 'SUB', columns: findHeaderColumns(rows, 'sub', [1]) },
+  ]
 
   return {
     staffGroups,
@@ -281,17 +285,17 @@ async function fetchSheets(path, params, env) {
   return data
 }
 
-async function getScheduleSheetTitle(spreadsheetId, env) {
+async function getScheduleSheetInfo(spreadsheetId, env) {
   const configuredTitle = env.GOOGLE_SCHEDULE_SHEET_NAME
 
   const data = await fetchSheets(spreadsheetId, {
-    fields: 'sheets(properties(title,index))',
+    fields: 'sheets(properties(title,index),merges)',
   }, env)
 
-  const titles = data.sheets
-    ?.map((sheet) => sheet.properties)
-    .sort((left, right) => left.index - right.index)
-    .map((properties) => properties.title)
+  const sheetEntries = data.sheets
+    ?.sort((left, right) => left.properties.index - right.properties.index) || []
+  const titles = sheetEntries
+    .map((sheet) => sheet.properties.title)
     .filter(Boolean) || []
 
   const normalizedTargetTitles = [
@@ -316,7 +320,8 @@ async function getScheduleSheetTitle(spreadsheetId, env) {
     )
   }
 
-  return matchingTitle
+  const sheet = sheetEntries.find((entry) => entry.properties.title === matchingTitle)
+  return { title: matchingTitle, merges: sheet?.merges || [] }
 }
 
 function buildDayEntry(date, row, layout) {
@@ -355,7 +360,8 @@ function buildDayEntry(date, row, layout) {
 
 export async function buildCleaningForecast(env) {
   const spreadsheetId = getSpreadsheetId(env)
-  const sheetTitle = await getScheduleSheetTitle(spreadsheetId, env)
+  const sheetInfo = await getScheduleSheetInfo(spreadsheetId, env)
+  const sheetTitle = sheetInfo.title
 
   if (!sheetTitle) {
     throw new Error(`Google Spreadsheet에서 ${DEFAULT_SCHEDULE_SHEET_NAME} 시트를 찾지 못했습니다.`)
@@ -366,7 +372,7 @@ export async function buildCleaningForecast(env) {
   }, env)
 
   const rows = data.values || []
-  const layout = buildScheduleLayout(rows)
+  const layout = buildScheduleLayout(rows, sheetInfo.merges)
   const rowsByDate = new Map()
 
   rows.slice(2).forEach((row) => {
