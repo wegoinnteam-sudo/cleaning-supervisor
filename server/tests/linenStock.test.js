@@ -23,6 +23,7 @@ function mock(rows = [[], headers], titles = ['실제 탭']) {
       writes++
       return { replies: [{}, {}] }
     }
+    if (path.endsWith('values:batchGetByDataFilter')) return { valueRanges: options.body.dataFilters.map(() => ({ valueRange: { values: [rows[1]] } })) }
     if (path.includes('/values/')) return { values: rows }
     return { sheets: titles.map(title => ({ properties: { title, sheetId: 7 } })) }
   }
@@ -55,8 +56,13 @@ test('internal A gaps and older dates preserved; append follows last record', as
   assert.deepEqual(rows.slice(0, 5), before)
   assert.equal(rows[5][0], '2026. 10. 8')
 })
-test('fail closed for ambiguous tabs, wrong headers and other data below A', async () => {
-  for (const m of [mock([[], headers], ['a', 'b']), mock([[], ['wrong']]), mock([[], headers, ['date'], ['', 10]])]) {
+test('header match ignores spaces and letter case', async () => {
+  const m = mock([[], headers.map(header => ` ${header.toUpperCase().replace(' ', '')} `)])
+  await saveStock(m.call, {}, { requestId, quantities })
+  assert.equal(m.writes(), 1)
+})
+test('fail closed for ambiguous tabs and wrong item headers', async () => {
+  for (const m of [mock([[], headers], ['a', 'b']), mock([[], ['wrong']])]) {
     await assert.rejects(saveStock(m.call, {}, { requestId, quantities }))
     assert.equal(m.writes(), 0)
   }
@@ -90,4 +96,36 @@ test('both runtime adapters fail without write credentials', async () => {
   const response = await onRequestPost({ env: {}, request: new Request('https://example.com/api/linen-stock', { method: 'POST', body: JSON.stringify({ requestId, quantities }) }) })
   assert.equal(response.status, 401)
   assert.equal((await response.json()).saved, undefined)
+})
+
+test('actual extra linen headers only match E:J; A:D contain fixed values', async () => {
+  const actualHeaders = ['Date', 'Room #', 'Staff(본인)', '사유', ...headers.slice(4)]
+  const m = mock([[], actualHeaders])
+  await saveStock(m.call, {}, { requestId, quantities }, new Date('2026-10-08T00:00:00Z'))
+  assert.deepEqual(m.rows[2], ['2026. 10. 8', 'Dirty sheet', 'sv', 'Rewash', 1, 2, 5, 6, 3, 4])
+})
+test('quantities follow matching header columns when E:J are reordered', async () => {
+  const m = mock([[], ['', '', '', '', ...headers.slice(4).reverse()]])
+  await saveStock(m.call, {}, { requestId, quantities })
+  assert.deepEqual(m.rows[2].slice(4), [4, 3, 6, 5, 2, 1])
+})
+test('duplicate or missing item headers cannot route quantities', async () => {
+  const m = mock([[], [...headers.slice(0, 9), headers[8]]])
+  await assert.rejects(saveStock(m.call, {}, { requestId, quantities }))
+  assert.equal(m.writes(), 0)
+})
+test('31 existing rows append all values into empty row 32', async () => {
+  const m = mock([[], headers, ...Array.from({ length: 29 }, () => ['2026. 10. 7'])])
+  await saveStock(m.call, {}, { requestId, quantities })
+  assert.equal(m.rows.length, 32)
+  assert.deepEqual(m.rows[31].slice(1), ['Dirty sheet', 'sv', 'Rewash', 1, 2, 5, 6, 3, 4])
+})
+
+test('a final record without a date still appends after that record', async () => {
+  const rows = [[], headers, ['2026. 10. 7'], [], ['', 'room', 'staff']]
+  const before = structuredClone(rows)
+  const m = mock(rows)
+  await saveStock(m.call, {}, { requestId, quantities })
+  assert.deepEqual(rows.slice(0, 5), before)
+  assert.equal(rows[5][1], 'Dirty sheet')
 })

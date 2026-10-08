@@ -91,7 +91,7 @@ app.post('/api/linen-stock', async (request, response) => {
     const status = error.status || error.response?.status || 500
     const code = [401, 403].includes(status) ? 'auth' : error instanceof TypeError || /^(ECONN|ENET|ETIMEDOUT|EAI_|ENOTFOUND)/.test(error.code || '') ? 'network' : 'api'
     console.error('[linen-stock]', code, error.message)
-    response.status(status).json({ message: '저장에 실패했습니다. 다시 확인해 주세요.', code, detail: error.message })
+    response.status(status).json({ message: '저장에 실패했습니다. 다시 확인해 주세요.', code, detail: String(error?.message || error) })
   }
 })
 

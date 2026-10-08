@@ -7,7 +7,20 @@ export const STOCK_ITEMS = [
   ['bathMat', '발매트'],
 ]
 export const STOCK_SPREADSHEET_ID = '1a8jUbszQLpq-mzbfIV4oPgxrGxFCrFAnc4lhlzVzL-w'
-const HEADERS = ['날짜', 'Dirty sheet', 'sv', 'Rewash', '이불(싱글)', '이불(더블)', '베개', '발매트', '(침대커버)싱글', '(침대커버)더블']
+const ITEM_HEADERS = {
+  '이불(싱글)': 'singleDuvetCover',
+  '이불(더블)': 'doubleDuvetCover',
+  '베개': 'pillowCover',
+  '발매트': 'bathMat',
+  '(침대커버)싱글': 'singleMattressCover',
+  '(침대커버)더블': 'doubleMattressCover',
+}
+const quoteTitle = title => `'${title.replaceAll("'", "''")}'`
+const normalizeHeader = value => String(value ?? '').replace(/\s/g, '').toLowerCase()
+function itemColumns(headers) {
+  const keys = headers.slice(4, 10).map(header => Object.entries(ITEM_HEADERS).find(([label]) => normalizeHeader(label) === normalizeHeader(header))?.[1])
+  return keys.length === 6 && keys.every(Boolean) && new Set(keys).size === 6 ? keys : null
+}
 export function stockDate(date = new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(date).map(p => [p.type, p.value]))
   return `${parts.year}. ${Number(parts.month)}. ${Number(parts.day)}`
@@ -38,21 +51,22 @@ export async function saveStock(call, env, body, date = new Date()) {
     return { saved: true, requestId, alreadySaved: true }
   }
   const info = await call(spreadsheetId, { fields: 'sheets(properties(sheetId,title))' })
-  const candidates = []
-  for (const { properties } of info.sheets || []) {
-    if (env.GOOGLE_STOCK_SHEET_TAB_NAME && properties.title !== env.GOOGLE_STOCK_SHEET_TAB_NAME) continue
-    const quoted = `'${properties.title.replaceAll("'", "''")}'`
-    const result = await call(`${spreadsheetId}/values/${encodeURIComponent(quoted)}`, { valueRenderOption: 'FORMULA' })
-    const values = result.values || []
-    if (!HEADERS.every((header, index) => String(values[1]?.[index] || '').trim() === header)) continue
-    candidates.push({ properties, values })
+  const sheets = (info.sheets || []).map(({ properties }) => properties)
+    .filter(({ title }) => !env.GOOGLE_STOCK_SHEET_TAB_NAME || title === env.GOOGLE_STOCK_SHEET_TAB_NAME)
+  if (!sheets.length) throw new Error(`GOOGLE_STOCK_SHEET_TAB_NAME(${env.GOOGLE_STOCK_SHEET_TAB_NAME}) 탭을 찾지 못했습니다.`)
+  // Check every tab's row-2 header in one request instead of reading each whole tab.
+  const headerResult = await call(`${spreadsheetId}/values:batchGetByDataFilter`, {}, { method: 'POST', body: {
+    dataFilters: sheets.map(({ title }) => ({ a1Range: `${quoteTitle(title)}!A2:J2` })),
+  } })
+  const headerRows = (headerResult.valueRanges || []).map(range => range.valueRange?.values?.[0] || [])
+  const candidates = sheets.map((properties, index) => ({ properties, columns: itemColumns(headerRows[index]) })).filter(candidate => candidate.columns)
+  if (candidates.length !== 1) {
+    const found = sheets.length === 1 ? ` 현재 2행: ${headerRows[0]?.join(' | ') || '(비어 있음)'}` : ` 일치한 탭 수: ${candidates.length}`
+    throw new Error(`2행 품목 헤더(E~J)가 일치하는 워크시트를 하나만 찾아야 합니다.${found}`)
   }
-  if (candidates.length !== 1) throw new Error('일치하는 실제 워크시트가 하나여야 합니다. GOOGLE_STOCK_SHEET_TAB_NAME과 2행 헤더를 확인해 주세요.')
-  const { properties, values } = candidates[0]
-  let last = 1
-  values.forEach((r, index) => { if (index >= 2 && String(r[0] ?? '').trim()) last = index })
-  // appendCells uses the last data row across the sheet. Fail closed if that differs from A.
-  if (values.slice(last + 1).some(r => r.some(v => v !== '' && v != null))) throw new Error('A열 마지막 기록 아래에 다른 열의 데이터가 있습니다. 기존 데이터 보호를 위해 저장을 중단합니다.')
+  const { properties, columns } = candidates[0]
+  row.splice(4, 6, ...columns.map(key => quantities[key]))
+  // Google appends after the final row containing data, skipping internal gaps.
   const result = await call(`${spreadsheetId}:batchUpdate`, {}, { method: 'POST', body: { requests: [
     { appendCells: { sheetId: properties.sheetId, rows: [{ values: row.map(value => ({ userEnteredValue: typeof value === 'number' ? { numberValue: value } : { stringValue: value } })) }], fields: 'userEnteredValue' } },
     { createDeveloperMetadata: { developerMetadata: { metadataId: id, metadataKey: 'sv-linen-stock', metadataValue: fingerprint, visibility: 'DOCUMENT', location: { spreadsheet: true } } } },
