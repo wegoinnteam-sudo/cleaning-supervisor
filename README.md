@@ -140,8 +140,8 @@ POST /api/room-checks
 `1a8jUbszQLpq-mzbfIV4oPgxrGxFCrFAnc4lhlzVzL-w`로 분리되어 있습니다.
 
 - `GOOGLE_STOCK_SPREADSHEET_ID`: 선택사항. 지정한다면 위 ID와 동일해야 합니다.
-- `GOOGLE_STOCK_SHEET_TAB_NAME`: 실제 탭 이름. 비어 있으면 Google API가 반환한
-  실제 탭들의 2행 E~J 품목명을 비교하고 6개 품목이 중복 없이 일치하는 탭이 하나일 때만 사용합니다. A~D의 헤더는 비교하지 않습니다.
+- 저장 탭: 주신 Wegoinn Reception 링크의 `extra linen`, **gid=1483534891**로 고정합니다. 탭 이름이 바뀌어도 같은 탭을 사용하며 `GOOGLE_STOCK_SHEET_TAB_NAME`은 사용하지 않습니다.
+  지정한 탭의 2행 E~J에서 6개 품목이 중복 없이 일치하는지 확인한 뒤 저장합니다. A~D의 헤더는 비교하지 않습니다. 대상 탭이 없으면 다른 탭에 저장하지 않고 오류를 반환합니다.
 - `GOOGLE_SERVICE_ACCOUNT_EMAIL`: 기존 서비스 계정 이메일을 재사용합니다.
 - `GOOGLE_PRIVATE_KEY` 또는 `GOOGLE_PRIVATE_KEY_BASE64`: 기존 서버 인증 키를 재사용합니다.
 - Express에서는 기존 `GOOGLE_APPLICATION_CREDENTIALS` 방식도 사용할 수 있습니다.

@@ -4,7 +4,7 @@ import { saveStock, stockRow, stockDate, STOCK_ITEMS } from '../../shared/linenS
 const quantities = Object.fromEntries(STOCK_ITEMS.map(([key], index) => [key, index + 1]))
 const requestId = '12345678-1234-4234-8234-123456789abc'
 const headers = ['날짜', 'Dirty sheet', 'sv', 'Rewash', '이불(싱글)', '이불(더블)', '베개', '발매트', '(침대커버)싱글', '(침대커버)더블']
-function mock(rows = [[], headers], titles = ['실제 탭']) {
+function mock(rows = [[], headers], titles = ['extra linen']) {
   let writes = 0
   const records = new Map()
   const call = async (path, params, options = {}) => {
@@ -16,7 +16,7 @@ function mock(rows = [[], headers], titles = ['실제 탭']) {
       const requests = options.body.requests
       const metadata = requests[1].createDeveloperMetadata.developerMetadata
       if (records.has(metadata.metadataId)) throw new Error('duplicate metadata')
-      assert.equal(requests[0].appendCells.sheetId, 7)
+      assert.equal(requests[0].appendCells.sheetId, 1483534891)
       assert.equal(requests[0].appendCells.fields, 'userEnteredValue')
       rows.push(requests[0].appendCells.rows[0].values.map(c => c.userEnteredValue.numberValue ?? c.userEnteredValue.stringValue))
       records.set(metadata.metadataId, metadata)
@@ -25,7 +25,7 @@ function mock(rows = [[], headers], titles = ['실제 탭']) {
     }
     if (path.endsWith('values:batchGetByDataFilter')) return { valueRanges: options.body.dataFilters.map(() => ({ valueRange: { values: [rows[1]] } })) }
     if (path.includes('/values/')) return { values: rows }
-    return { sheets: titles.map(title => ({ properties: { title, sheetId: 7 } })) }
+    return { sheets: titles.map(title => ({ properties: { title, sheetId: title === 'extra linen' || title === 'custom linen' ? 1483534891 : 7 } })) }
   }
   return { call, rows, writes: () => writes }
 }
@@ -66,6 +66,36 @@ test('fail closed for ambiguous tabs and wrong item headers', async () => {
     await assert.rejects(saveStock(m.call, {}, { requestId, quantities }))
     assert.equal(m.writes(), 0)
   }
+})
+test('default target is extra linen even when other tabs have matching headers', async () => {
+  const m = mock([[], headers], ['other linen', 'extra linen'])
+  const call = async (path, params, options = {}) => {
+    if (path.endsWith('values:batchGetByDataFilter')) {
+      assert.deepEqual(options.body.dataFilters, [{ a1Range: "'extra linen'!A2:J2" }])
+    }
+    return m.call(path, params, options)
+  }
+  const result = await saveStock(call, {}, { requestId, quantities })
+  assert.equal(result.sheetTitle, 'extra linen')
+  assert.equal(m.writes(), 1)
+})
+test('missing extra linen never falls back to another matching tab', async () => {
+  const m = mock([[], headers], ['other linen'])
+  await assert.rejects(saveStock(m.call, {}, { requestId, quantities }), /extra linen/)
+  assert.equal(m.writes(), 0)
+})
+test('a matching name with the wrong gid cannot receive a write', async () => {
+  const m = mock()
+  const call = async (path, params, options) => params.fields
+    ? { sheets: [{ properties: { title: 'extra linen', sheetId: 7 } }] }
+    : m.call(path, params, options)
+  await assert.rejects(saveStock(call, {}, { requestId, quantities }), /1483534891/)
+  assert.equal(m.writes(), 0)
+})
+test('target tab ID is respected even after renaming or with stale name configuration', async () => {
+  const m = mock([[], headers], ['custom linen'])
+  const result = await saveStock(m.call, { GOOGLE_STOCK_SHEET_TAB_NAME: 'custom linen' }, { requestId, quantities })
+  assert.equal(result.sheetTitle, 'custom linen')
 })
 test('Google API/network failure never returns success', async () => {
   await assert.rejects(saveStock(async () => { throw new TypeError('network') }, {}, { requestId, quantities }))

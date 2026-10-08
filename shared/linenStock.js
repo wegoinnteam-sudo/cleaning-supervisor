@@ -7,6 +7,7 @@ export const STOCK_ITEMS = [
   ['bathMat', '발매트'],
 ]
 export const STOCK_SPREADSHEET_ID = '1a8jUbszQLpq-mzbfIV4oPgxrGxFCrFAnc4lhlzVzL-w'
+export const STOCK_SHEET_ID = 1483534891
 const ITEM_HEADERS = {
   '이불(싱글)': 'singleDuvetCover',
   '이불(더블)': 'doubleDuvetCover',
@@ -52,9 +53,9 @@ export async function saveStock(call, env, body, date = new Date()) {
   }
   const info = await call(spreadsheetId, { fields: 'sheets(properties(sheetId,title))' })
   const sheets = (info.sheets || []).map(({ properties }) => properties)
-    .filter(({ title }) => !env.GOOGLE_STOCK_SHEET_TAB_NAME || title === env.GOOGLE_STOCK_SHEET_TAB_NAME)
-  if (!sheets.length) throw new Error(`GOOGLE_STOCK_SHEET_TAB_NAME(${env.GOOGLE_STOCK_SHEET_TAB_NAME}) 탭을 찾지 못했습니다.`)
-  // Check every tab's row-2 header in one request instead of reading each whole tab.
+    .filter(({ sheetId }) => sheetId === STOCK_SHEET_ID)
+  if (!sheets.length) throw new Error(`extra linen 대상 탭(gid=${STOCK_SHEET_ID})을 찾지 못했습니다.`)
+  // Validate the target tab's row-2 headers before writing.
   const headerResult = await call(`${spreadsheetId}/values:batchGetByDataFilter`, {}, { method: 'POST', body: {
     dataFilters: sheets.map(({ title }) => ({ a1Range: `${quoteTitle(title)}!A2:J2` })),
   } })
