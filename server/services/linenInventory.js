@@ -142,7 +142,7 @@ function getPrivateKey() {
   return process.env.GOOGLE_PRIVATE_KEY || process.env.PRIVATE_KEY || ''
 }
 
-function getGoogleAuth(scopes) {
+export function getGoogleAuth(scopes) {
   const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
     || process.env.GOOGLE_CLIENT_EMAIL
     || process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL

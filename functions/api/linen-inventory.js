@@ -315,7 +315,7 @@ function findColumns(rows, sheetTitle) {
   return columns
 }
 
-async function fetchSheets(spreadsheetPath, params, env, options = {}) {
+export async function fetchSheets(spreadsheetPath, params, env, options = {}) {
   const url = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetPath}`)
   Object.entries(params).forEach(([key, value]) => {
     url.searchParams.set(key, value)
@@ -340,7 +340,7 @@ async function fetchSheets(spreadsheetPath, params, env, options = {}) {
   const data = await response.json()
 
   if (!response.ok) {
-    throw new Error(data.error?.message || 'Google Spreadsheet 요청에 실패했습니다.')
+    throw Object.assign(new Error(data.error?.message || 'Google Spreadsheet 요청에 실패했습니다.'), { status: response.status })
   }
 
   return data

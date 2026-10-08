@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
+import LinenStock from './LinenStock.jsx'
 
 const ASSIGNMENT_REFRESH_INTERVAL_MS = 10_000
 
@@ -804,7 +805,9 @@ function App() {
         >
           {t.forecastTab}
         </button>
+        <button type="button" className={activeCategory === 'linen-stock' ? 'active' : ''} onClick={() => setActiveCategory('linen-stock')}>린넨 재고 파악</button>
       </nav>
+      <div hidden={activeCategory !== 'linen-stock'}><LinenStock /></div>
 
       {error && (
         <section className="notice" role="alert">

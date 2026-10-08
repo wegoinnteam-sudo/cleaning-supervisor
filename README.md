@@ -125,3 +125,73 @@ POST /api/room-checks
 ```
 
 응답에는 `rooms`, `countsByType`, `total`, `byStaff`, `date`, `updatedAt`가 포함됩니다.
+
+## 린넨 재고 파악 — 신규 기록 카테고리
+
+기존 린넨 재고파악(입고·세탁필요수량)과 별도로 마지막 카테고리에 추가했습니다.
+6개 수량은 기본 0이며 음수·소수·안전한 정수 범위를 벗어난 값과 전체 0을 거부합니다.
+저장 성공 응답을 확인한 경우만 초기화합니다. 실패 시 입력값과 요청 ID를 유지하며
+자동 재시도하지 않습니다. 결과가 불확실하면 입력을 잠그고 같은 저장 버튼으로 같은
+요청을 확인합니다. 카테고리를 전환해도 진행 중인 요청을 유지합니다.
+
+### 인증과 대상 시트 설정
+
+기존 GOOGLE_SPREADSHEET_ID는 변경하지 마세요. 신규 기능 대상은
+`1a8jUbszQLpq-mzbfIV4oPgxrGxFCrFAnc4lhlzVzL-w`로 분리되어 있습니다.
+
+- `GOOGLE_STOCK_SPREADSHEET_ID`: 선택사항. 지정한다면 위 ID와 동일해야 합니다.
+- `GOOGLE_STOCK_SHEET_TAB_NAME`: 실제 탭 이름. 비어 있으면 Google API가 반환한
+  실제 탭들의 2행 A~J 헤더를 비교하고 정확하게 일치하는 탭이 하나일 때만 사용합니다.
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL`: 기존 서비스 계정 이메일을 재사용합니다.
+- `GOOGLE_PRIVATE_KEY` 또는 `GOOGLE_PRIVATE_KEY_BASE64`: 기존 서버 인증 키를 재사용합니다.
+- Express에서는 기존 `GOOGLE_APPLICATION_CREDENTIALS` 방식도 사용할 수 있습니다.
+
+Google Cloud 프로젝트에서 Google Sheets API를 활성화하고, 대상 스프레드시트의
+공유 메뉴에서 **GOOGLE_SERVICE_ACCOUNT_EMAIL에 설정한 실제 이메일**을 편집자로
+추가하세요. 현재 작업 환경에는 인증 환경변수가 없어 실제 계정 이메일과 실제 탭
+이름을 확인하지 못했습니다. 임의의 탭을 생성하지 않습니다.
+Codespaces에서는 Secrets 또는 무시되는 `.env`에 설정하고 API 프로세스를 재시작하세요.
+Cloudflare Pages에서는 서버 환경변수/Secrets로 설정한 후 재배포하세요.
+인증 키를 `VITE_` 환경변수로 만들거나 소스에 넣지 마세요.
+기존 앱에는 코드상 로그인 미들웨어가 없으며 신규 경로도 기존 API와 같은 접근
+구조를 따릅니다. 기존 호스팅 접근 제한이 있다면 `/api/linen-stock`에도 적용하세요.
+
+### 저장 방식과 보호 장치
+
+공통 로직은 `shared/linenStock.js`, 로컬 Express API와 Cloudflare Pages API는
+각각 `server/services/linenStock.js`, `functions/api/linen-stock.js`입니다.
+서버에서 한국 날짜 `YYYY. M. D`와 고정값을 만들고 E~J를
+`싱글 이불, 더블 이불, 베개, 발매트, 싱글 매트리스, 더블 매트리스` 순서로
+숫자(0 포함)로 기록합니다.
+
+전체 시트의 값을 확인하여 A열 마지막 기록 아래에 다른 데이터가 없을 때만
+`appendCells`로 마지막 기록 아래에 새 행을 추가합니다. 중간 공백을 채우거나
+기존 행을 수정·정렬·이동하지 않습니다. A열 마지막 기록 아래에 다른 열의 데이터가
+있으면 요구한 위치와 기존 데이터 보존을 동시에 보장할 수 없어 실패 처리합니다.
+
+요청 UUID에서 파생한 양의 metadataId와 수량 지문을 Google developerMetadata에
+저장합니다. 행 추가와 메타데이터 생성은 하나의 원자적 batchUpdate입니다.
+같은 ID를 동시에 생성하면 Google의 ID 유일성 검증으로 전체 요청이 실패하여
+두 번째 행을 추가하지 않습니다. 사용자 재시도는 메타데이터를 조회해 저장 완료를
+확인합니다. 드문 해시 충돌은 다른 요청의 성공으로 처리하지 않고 실패합니다.
+메타데이터를 삭제하면 중복 방지 이력을 잃으며, Sheets의 메타데이터 한도에
+도달하면 저장은 실패합니다. 새로고침/브라우저 종료 전 결과가 불확실한 경우
+시트에서 실제 기록을 먼저 확인하세요(요청 상태는 현재 앱 세션에서 유지됨).
+외부 사용자가 동시에 다른 열에 데이터를 추가하는 상황까지 원자적으로 검증하지는
+못하므로 이 기록 시트는 A열을 날짜 기준 열로 유지해야 합니다.
+
+### 검증 결과 및 남은 확인
+
+```bash
+node server/tests/linenStock.test.js
+npm run lint
+npm run build
+```
+
+모킹 테스트는 날짜 경계, 매핑, 0 및 잘못된 수량, 3행 시작, 중간 공백,
+동일 날짜 별도 행, 이전 날짜 기록 보존, 탭·헤더 검증, 인증·네트워크 실패,
+동시 요청, 응답 유실 후 중복 방지를 검증합니다.
+실제 브라우저 모바일 조작과 기존 앱 전체 기능의 회귀 테스트는 아직 미실시입니다.
+실제 Sheets 통합 테스트 역시 인증 정보가 없어 미실시이며, 실제 테스트 기록은
+사용자가 승인한 후에만 추가합니다. 기존 카테고리·저장 로직·DB는 유지했습니다.
+Google API 근거: https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/batchUpdate
