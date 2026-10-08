@@ -1040,7 +1040,7 @@ function App() {
         </div>
       )}
 
-      <div className="linen-stock-wrap" hidden={activeCategory !== 'linen'}><LinenStock /></div>
+      <div className="linen-stock-wrap" hidden={activeCategory !== 'linen'}><LinenStock language={language} /></div>
 
       {activeCategory === 'items' && assignment && (
         <div className="item-count-layout">

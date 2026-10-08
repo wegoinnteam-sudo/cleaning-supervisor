@@ -1,13 +1,34 @@
 import { useRef, useState } from 'react'
 import { STOCK_ITEMS } from '../shared/linenStock.js'
 import './LinenStock.css'
-const FAILURE_REASONS = {
-  auth: 'Google 인증 정보 또는 스프레드시트 공유 권한을 확인해 주세요.',
-  network: 'API 서버에 연결하지 못했습니다.',
-  api: 'Google Sheets 저장 중 오류가 발생했습니다.',
+const translations = {
+  ko: {
+    title: '린넨 재고파악', heading: '린넨 재고 파악', quantity: '수량',
+    save: '저장하기', saving: '저장 중…',
+    invalid: '0 이상의 정수를 입력해 주세요.', empty: '수량을 하나 이상 입력해 주세요.',
+    success: '린넨 재고가 정상적으로 저장되었습니다.', failure: '저장에 실패했습니다. 다시 확인해 주세요.',
+    auth: 'Google 인증 정보 또는 스프레드시트 공유 권한을 확인해 주세요.',
+    network: 'API 서버에 연결하지 못했습니다.', api: 'Google Sheets 저장 중 오류가 발생했습니다.',
+    locked: '저장 결과를 확인하지 못해 입력값을 잠갔습니다. 저장하기를 다시 누르면 중복 없이 저장 여부를 확인합니다.',
+  },
+  en: {
+    title: 'Linen Inventory', heading: 'Linen Inventory Entry', quantity: 'quantity',
+    save: 'Save', saving: 'Saving…',
+    invalid: 'Enter a non-negative whole number.', empty: 'Enter at least one quantity greater than zero.',
+    success: 'Linen inventory saved successfully.', failure: 'Unable to save. Please check and try again.',
+    auth: 'Check your Google credentials and spreadsheet sharing permissions.',
+    network: 'Unable to connect to the API server.', api: 'An error occurred while saving to Google Sheets.',
+    locked: 'The save result could not be confirmed, so the inputs are locked. Click Save again to check without creating a duplicate.',
+  },
+}
+const englishItems = {
+  singleDuvetCover: 'Single duvet cover', doubleDuvetCover: 'Double duvet cover',
+  singleMattressCover: 'Single mattress cover', doubleMattressCover: 'Double mattress cover',
+  pillowCover: 'Pillow cover', bathMat: 'Bath mat',
 }
 const zeroes = () => Object.fromEntries(STOCK_ITEMS.map(([key]) => [key, '0']))
-export default function LinenStock() {
+export default function LinenStock({ language = 'ko' }) {
+  const t = translations[language] || translations.ko
   const [inputs, setInputs] = useState(zeroes)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
@@ -19,8 +40,8 @@ export default function LinenStock() {
     event.preventDefault()
     if (busy.current) return
     const quantities = Object.fromEntries(STOCK_ITEMS.map(([key]) => [key, Number(inputs[key])]))
-    if (STOCK_ITEMS.some(([key]) => !/^\d+$/.test(inputs[key]) || !Number.isSafeInteger(quantities[key]))) return setMessage('0 이상의 정수를 입력해 주세요.')
-    if (Object.values(quantities).every(q => q === 0)) return setMessage('수량을 하나 이상 입력해 주세요.')
+    if (STOCK_ITEMS.some(([key]) => !/^\d+$/.test(inputs[key]) || !Number.isSafeInteger(quantities[key]))) return setMessage('invalid')
+    if (Object.values(quantities).every(q => q === 0)) return setMessage('empty')
     pending.current ||= { requestId: crypto.randomUUID(), quantities }
     busy.current = true
     setSaving(true)
@@ -37,12 +58,12 @@ export default function LinenStock() {
       }
       pending.current = null
       setInputs(zeroes())
-      setMessage('린넨 재고가 정상적으로 저장되었습니다.')
+      setMessage('success')
     } catch (error) {
       const code = error.code || 'network'
       console.error('[linen-stock]', code, error)
-      setMessage('저장에 실패했습니다. 다시 확인해 주세요.')
-      setReason(`${FAILURE_REASONS[code] || FAILURE_REASONS.api} (${error.message})`)
+      setMessage('failure')
+      setReason(['auth', 'network', 'api'].includes(code) ? code : 'api')
     } finally {
       busy.current = false
       setSaving(false)
@@ -51,21 +72,24 @@ export default function LinenStock() {
   }
   return <section className="container-panel linen-stock-entry">
     <div className="panel-heading">
-      <p className="container-label">린넨 재고파악</p>
-      <h2>린넨 재고 파악</h2>
+      <p className="container-label">{t.title}</p>
+      <h2>{t.heading}</h2>
     </div>
     <form onSubmit={save}>
-      {STOCK_ITEMS.map(([key, label]) => <label className="stock-entry-row" key={key}>
+      {STOCK_ITEMS.map(([key, koreanLabel]) => {
+        const label = language === 'en' ? englishItems[key] : koreanLabel
+        return <label className="stock-entry-row" key={key}>
         <span>{label}</span>
-        <input aria-label={`${label} 수량`} type="text" inputMode="numeric" pattern="[0-9]+" required value={inputs[key]} disabled={saving || locked} onChange={event => {
+        <input aria-label={`${label} ${t.quantity}`} type="text" inputMode="numeric" pattern="[0-9]+" required value={inputs[key]} disabled={saving || locked} onChange={event => {
           const value = event.target.value
           if (/^\d*$/.test(value) && (value === '' || Number.isSafeInteger(Number(value)))) setInputs(current => ({ ...current, [key]: value }))
         }} onBlur={() => { if (inputs[key] === '') setInputs(current => ({ ...current, [key]: '0' })) }} />
-      </label>)}
-      <button className="refresh-button stock-save-button" disabled={saving} type="submit">{saving ? '저장 중…' : '저장하기'}</button>
-      {message && <p role="status" aria-live="polite">{message}</p>}
-      {reason && <p className="stock-failure-reason">{reason}</p>}
-      {locked && !saving && <p>저장 결과를 확인하지 못해 입력값을 잠갔습니다. 저장하기를 다시 누르면 중복 없이 저장 여부를 확인합니다.</p>}
+      </label>
+      })}
+      <button className="refresh-button stock-save-button" disabled={saving} type="submit">{saving ? t.saving : t.save}</button>
+      {message && <p role="status" aria-live="polite">{t[message]}</p>}
+      {reason && <p className="stock-failure-reason">{t[reason]}</p>}
+      {locked && !saving && <p>{t.locked}</p>}
     </form>
   </section>
 }
