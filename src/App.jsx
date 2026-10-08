@@ -805,9 +805,7 @@ function App() {
         >
           {t.forecastTab}
         </button>
-        <button type="button" className={activeCategory === 'linen-stock' ? 'active' : ''} onClick={() => setActiveCategory('linen-stock')}>린넨 재고 파악</button>
       </nav>
-      <div hidden={activeCategory !== 'linen-stock'}><LinenStock /></div>
 
       {error && (
         <section className="notice" role="alert">
@@ -1041,6 +1039,8 @@ function App() {
           </section>
         </div>
       )}
+
+      <div className="linen-stock-wrap" hidden={activeCategory !== 'linen'}><LinenStock /></div>
 
       {activeCategory === 'items' && assignment && (
         <div className="item-count-layout">

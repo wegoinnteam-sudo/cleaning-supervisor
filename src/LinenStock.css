@@ -1,5 +1,7 @@
-.linen-stock-entry { max-width: 720px; margin: 20px auto; padding: 20px; }
-.stock-entry-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid #e2e8f0; }
-.stock-entry-row input { width: 100px; min-height: 44px; padding: 8px 12px; text-align: right; font: inherit; font-size: 18px; border: 1px solid #cbd5e1; border-radius: 8px; }
+.linen-stock-wrap { width: 100%; margin-top: 24px; }
+.linen-stock-entry form { padding: 0 22px 22px; }
+.stock-entry-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.stock-entry-row input { width: 100px; min-height: 44px; padding: 8px 12px; text-align: right; font: inherit; font-size: 18px; border: 1px solid var(--border); border-radius: 8px; }
 .stock-save-button { margin-top: 20px; min-height: 44px; width: 100%; }
-@media (max-width: 480px) { .linen-stock-entry { padding: 16px; } .stock-entry-row { gap: 8px; } .stock-entry-row input { width: 80px; } }
+.stock-failure-reason { color: #b91c1c; font-size: 14px; }
+@media (max-width: 480px) { .linen-stock-entry form { padding: 0 16px 16px; } .stock-entry-row { gap: 8px; } .stock-entry-row input { width: 80px; } }

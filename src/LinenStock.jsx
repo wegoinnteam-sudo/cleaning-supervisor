@@ -1,11 +1,17 @@
 import { useRef, useState } from 'react'
 import { STOCK_ITEMS } from '../shared/linenStock.js'
 import './LinenStock.css'
+const FAILURE_REASONS = {
+  auth: 'Google 인증 정보 또는 스프레드시트 공유 권한을 확인해 주세요.',
+  network: 'API 서버에 연결하지 못했습니다.',
+  api: 'Google Sheets 저장 중 오류가 발생했습니다.',
+}
 const zeroes = () => Object.fromEntries(STOCK_ITEMS.map(([key]) => [key, '0']))
 export default function LinenStock() {
   const [inputs, setInputs] = useState(zeroes)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [reason, setReason] = useState('')
   const pending = useRef(null)
   const [locked, setLocked] = useState(false)
   const busy = useRef(false)
@@ -19,19 +25,24 @@ export default function LinenStock() {
     busy.current = true
     setSaving(true)
     setMessage('')
+    setReason('')
     try {
       const response = await fetch('/api/linen-stock', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(pending.current) })
-      const data = await response.json()
+      const data = await response.json().catch(() => ({}))
       if (!response.ok || data.saved !== true || data.requestId !== pending.current.requestId) {
-        if (response.status === 400) pending.current = null
-        throw new Error(`${data.code || 'api'}: ${data.message || response.status}`)
+        // 4xx: the server rejected the request before writing, so a fresh request ID is safe.
+        if (response.status >= 400 && response.status < 500) pending.current = null
+        const code = data.code || (response.status >= 500 && !data.message ? 'network' : 'api')
+        throw Object.assign(new Error(data.detail || data.message || `HTTP ${response.status}`), { code })
       }
       pending.current = null
       setInputs(zeroes())
       setMessage('린넨 재고가 정상적으로 저장되었습니다.')
     } catch (error) {
-      console.error('[linen-stock]', error)
+      const code = error.code || 'network'
+      console.error('[linen-stock]', code, error)
       setMessage('저장에 실패했습니다. 다시 확인해 주세요.')
+      setReason(`${FAILURE_REASONS[code] || FAILURE_REASONS.api} (${error.message})`)
     } finally {
       busy.current = false
       setSaving(false)
@@ -39,7 +50,10 @@ export default function LinenStock() {
     }
   }
   return <section className="container-panel linen-stock-entry">
-    <div className="panel-heading"><h2>린넨 재고 파악</h2></div>
+    <div className="panel-heading">
+      <p className="container-label">린넨 재고파악</p>
+      <h2>린넨 재고 파악</h2>
+    </div>
     <form onSubmit={save}>
       {STOCK_ITEMS.map(([key, label]) => <label className="stock-entry-row" key={key}>
         <span>{label}</span>
@@ -50,7 +64,8 @@ export default function LinenStock() {
       </label>)}
       <button className="refresh-button stock-save-button" disabled={saving} type="submit">{saving ? '저장 중…' : '저장하기'}</button>
       {message && <p role="status" aria-live="polite">{message}</p>}
-      {locked && !saving && <p>입력값은 유지됩니다. 저장하기를 다시 누르면 같은 요청 ID로 저장 여부를 확인합니다.</p>}
+      {reason && <p className="stock-failure-reason">{reason}</p>}
+      {locked && !saving && <p>저장 결과를 확인하지 못해 입력값을 잠갔습니다. 저장하기를 다시 누르면 중복 없이 저장 여부를 확인합니다.</p>}
     </form>
   </section>
 }
