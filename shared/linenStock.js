@@ -26,6 +26,12 @@ export function stockDate(date = new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(date).map(p => [p.type, p.value]))
   return `${parts.year}. ${Number(parts.month)}. ${Number(parts.day)}`
 }
+// Sheets date serial (days since 1899-12-30) so column A stores a real date, not text.
+function dateSerial(label) {
+  const [year, month, day] = label.split('. ').map(Number)
+  return Date.UTC(year, month - 1, day) / 86400000 + 25569
+}
+const dateCell = label => ({ userEnteredValue: { numberValue: dateSerial(label) }, userEnteredFormat: { numberFormat: { type: 'DATE', pattern: 'yyyy. m. d' } } })
 export function stockRow(quantities, date) {
   if (!quantities || STOCK_ITEMS.some(([key]) => !Number.isSafeInteger(quantities[key]) || quantities[key] < 0)) throw Object.assign(new Error('0 이상의 정수를 입력해 주세요.'), { status: 400 })
   if (STOCK_ITEMS.every(([key]) => quantities[key] === 0)) throw Object.assign(new Error('수량을 하나 이상 입력해 주세요.'), { status: 400 })
@@ -69,7 +75,7 @@ export async function saveStock(call, env, body, date = new Date()) {
   row.splice(4, 6, ...columns.map(key => quantities[key]))
   // Google appends after the final row containing data, skipping internal gaps.
   const result = await call(`${spreadsheetId}:batchUpdate`, {}, { method: 'POST', body: { requests: [
-    { appendCells: { sheetId: properties.sheetId, rows: [{ values: row.map(value => ({ userEnteredValue: typeof value === 'number' ? { numberValue: value } : { stringValue: value } })) }], fields: 'userEnteredValue' } },
+    { appendCells: { sheetId: properties.sheetId, rows: [{ values: row.map((value, index) => index === 0 ? dateCell(value) : { userEnteredValue: typeof value === 'number' ? { numberValue: value } : { stringValue: value } }) }], fields: 'userEnteredValue,userEnteredFormat.numberFormat' } },
     { createDeveloperMetadata: { developerMetadata: { metadataId: id, metadataKey: 'sv-linen-stock', metadataValue: fingerprint, visibility: 'DOCUMENT', location: { spreadsheet: true } } } },
   ] } })
   if (!result.replies || result.replies.length !== 2) throw new Error('Google Sheets 저장 응답을 확인할 수 없습니다.')

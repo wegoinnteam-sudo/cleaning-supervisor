@@ -3,7 +3,7 @@ import { STOCK_ITEMS } from '../shared/linenStock.js'
 import './LinenStock.css'
 const translations = {
   ko: {
-    title: '재새탁 필요 시트', heading: '재새탁 필요 시트', quantity: '수량',
+    title: '린넨 재고파악', heading: '재새탁 수량 파악', quantity: '수량',
     save: '저장하기', saving: '저장 중…',
     invalid: '0 이상의 정수를 입력해 주세요.', empty: '수량을 하나 이상 입력해 주세요.',
     success: '린넨 재고가 정상적으로 저장되었습니다.', failure: '저장에 실패했습니다. 다시 확인해 주세요.',
@@ -12,7 +12,7 @@ const translations = {
     locked: '저장 결과를 확인하지 못해 입력값을 잠갔습니다. 저장하기를 다시 누르면 중복 없이 저장 여부를 확인합니다.',
   },
   en: {
-    title: 'Sheets Requiring Rewash', heading: 'Sheets Requiring Rewash', quantity: 'quantity',
+    title: 'Linen Inventory', heading: 'Rewash Quantity Check', quantity: 'quantity',
     save: 'Save', saving: 'Saving…',
     invalid: 'Enter a non-negative whole number.', empty: 'Enter at least one quantity greater than zero.',
     success: 'Linen inventory saved successfully.', failure: 'Unable to save. Please check and try again.',

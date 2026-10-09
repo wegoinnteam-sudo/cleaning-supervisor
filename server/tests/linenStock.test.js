@@ -17,8 +17,12 @@ function mock(rows = [[], headers], titles = ['extra linen']) {
       const metadata = requests[1].createDeveloperMetadata.developerMetadata
       if (records.has(metadata.metadataId)) throw new Error('duplicate metadata')
       assert.equal(requests[0].appendCells.sheetId, 1483534891)
-      assert.equal(requests[0].appendCells.fields, 'userEnteredValue')
-      rows.push(requests[0].appendCells.rows[0].values.map(c => c.userEnteredValue.numberValue ?? c.userEnteredValue.stringValue))
+      assert.equal(requests[0].appendCells.fields, 'userEnteredValue,userEnteredFormat.numberFormat')
+      const [date, ...rest] = requests[0].appendCells.rows[0].values
+      assert.equal(date.userEnteredValue.stringValue, undefined)
+      assert.deepEqual(date.userEnteredFormat.numberFormat, { type: 'DATE', pattern: 'yyyy. m. d' })
+      const d = new Date((date.userEnteredValue.numberValue - 25569) * 86400000)
+      rows.push([`${d.getUTCFullYear()}. ${d.getUTCMonth() + 1}. ${d.getUTCDate()}`, ...rest.map(c => c.userEnteredValue.numberValue ?? c.userEnteredValue.stringValue)])
       records.set(metadata.metadataId, metadata)
       writes++
       return { replies: [{}, {}] }
