@@ -26,10 +26,11 @@ const englishItems = {
   singleMattressCover: 'Single mattress cover', doubleMattressCover: 'Double mattress cover',
   pillowCover: 'Pillow cover', bathMat: 'Bath mat',
 }
-const zeroes = () => Object.fromEntries(STOCK_ITEMS.map(([key]) => [key, '0']))
+// Inputs start blank; a blank field counts as 0.
+const blanks = () => Object.fromEntries(STOCK_ITEMS.map(([key]) => [key, '']))
 export default function LinenStock({ language = 'ko' }) {
   const t = translations[language] || translations.ko
-  const [inputs, setInputs] = useState(zeroes)
+  const [inputs, setInputs] = useState(blanks)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [reason, setReason] = useState('')
@@ -40,7 +41,7 @@ export default function LinenStock({ language = 'ko' }) {
     event.preventDefault()
     if (busy.current) return
     const quantities = Object.fromEntries(STOCK_ITEMS.map(([key]) => [key, Number(inputs[key])]))
-    if (STOCK_ITEMS.some(([key]) => !/^\d+$/.test(inputs[key]) || !Number.isSafeInteger(quantities[key]))) return setMessage('invalid')
+    if (STOCK_ITEMS.some(([key]) => !/^\d*$/.test(inputs[key]) || !Number.isSafeInteger(quantities[key]))) return setMessage('invalid')
     if (Object.values(quantities).every(q => q === 0)) return setMessage('empty')
     pending.current ||= { requestId: crypto.randomUUID(), quantities }
     busy.current = true
@@ -57,7 +58,7 @@ export default function LinenStock({ language = 'ko' }) {
         throw Object.assign(new Error(data.detail || data.message || `HTTP ${response.status}`), { code })
       }
       pending.current = null
-      setInputs(zeroes())
+      setInputs(blanks())
       setMessage('success')
     } catch (error) {
       const code = error.code || 'network'
@@ -80,10 +81,10 @@ export default function LinenStock({ language = 'ko' }) {
         const label = language === 'en' ? englishItems[key] : koreanLabel
         return <label className="stock-entry-row" key={key}>
         <span>{label}</span>
-        <input aria-label={`${label} ${t.quantity}`} type="text" inputMode="numeric" pattern="[0-9]+" required value={inputs[key]} disabled={saving || locked} onChange={event => {
+        <input aria-label={`${label} ${t.quantity}`} type="text" inputMode="numeric" pattern="[0-9]*" placeholder="0" value={inputs[key]} disabled={saving || locked} onChange={event => {
           const value = event.target.value
           if (/^\d*$/.test(value) && (value === '' || Number.isSafeInteger(Number(value)))) setInputs(current => ({ ...current, [key]: value }))
-        }} onBlur={() => { if (inputs[key] === '') setInputs(current => ({ ...current, [key]: '0' })) }} />
+        }} />
       </label>
       })}
       <button className="refresh-button stock-save-button" disabled={saving} type="submit">{saving ? t.saving : t.save}</button>
